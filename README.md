@@ -6,9 +6,9 @@ Create, handle, and store bread-recipes.
 
 ## System-requirements
 
-* docker-ce
-* docker-compose
+* `docker-ce`
+* `docker-compose`
 
 ## Set-up
 
-* docker-compose up
+* `docker-compose up`
