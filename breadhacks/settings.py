@@ -81,6 +81,7 @@ DATABASES = {
         'PASSWORD': '1234',
         'HOST': 'db',
         'PORT': '3306',
+        'AUTOCOMMIT': False,
     }
 }
 
