@@ -22,5 +22,6 @@ class Ingredient(models.Model):
         db_table = 'ingredient'
 
     def save(self, *args, **kwargs):
-        self.hash32 = hash32(self.name + (self.variety or ''))
+        self.hash32 = hash32(self.name + (self.type or '') +
+                             (self.variety or ''))
         super().save(*args, **kwargs)
