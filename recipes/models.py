@@ -18,6 +18,9 @@ class Ingredient(models.Model):
     type = models.CharField(max_length=60, choices=TYPES)
     hash32 = models.BigIntegerField(null=True)
 
+    class Meta:
+        db_table = 'ingredient'
+
     def save(self, *args, **kwargs):
         self.hash32 = hash32(self.name + (self.variety or ''))
         super().save(*args, **kwargs)
