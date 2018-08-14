@@ -2,7 +2,7 @@ from django.db import models
 from farmhash import hash32
 
 # Create your models here.
-class Ingredients(models.Model):
+class Ingredient(models.Model):
     TYPES = (
             ('flour', 'flour'),
             ('water', 'water'),
