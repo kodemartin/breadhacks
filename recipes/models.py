@@ -7,7 +7,11 @@ class Ingredient(models.Model):
             ('flour', 'flour'),
             ('water', 'water'),
             ('liquid', 'liquid'),
-            ('dry', 'other')
+            ('fat', 'fat'),
+            ('seed', 'seed'),
+            ('other', 'other'),
+            ('meal', 'meal'),
+            ('malt', 'malt')
             )
     name = models.CharField(max_length=60)
     variety = models.CharField(max_length=60, null=True, default=None)
