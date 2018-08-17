@@ -1,0 +1,34 @@
+version: '3.2'
+
+services:
+
+  db:
+    image: mysql
+    container_name: docker-mysql
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234
+      MYSQL_DATABASE: breadhacks
+      MYSQL_USER: baker
+      MYSQL_PASSWORD: 1234
+    volumes:
+        - type: volume
+          source: breadhacks
+          target: /var/lib/mysql
+    ports:
+        - 3008:3006
+    
+  web:
+    build: .
+    command: python3 manage.py runserver 0.0.0.0:8000
+    container_name: django-project
+    volumes:
+        - .:/src
+    ports:
+        - "8000:8000"
+    depends_on:
+        - db
+
+volumes:
+    breadhacks:
