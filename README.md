@@ -8,6 +8,7 @@ Create, handle, and store bread-recipes.
 
 * `docker-ce`
 * `docker-compose`
+* `python3`
 
 ## Set-up
 
