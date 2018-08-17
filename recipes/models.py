@@ -62,6 +62,8 @@ class MixtureIngredients(models.Model):
         db_table = 'mixture_ingredients'
         ordering = ['mixture_id', 'ingredient_id', 'quantity']
 
+    #TODO: Populate ingredient_quantities and derived properties
+    #      in the ``mixture`` instance
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ingredient_quantities = None
