@@ -23,12 +23,14 @@ class Ingredient(models.Model):
         db_table = 'ingredient'
 
     def save(self, *args, **kwargs):
-        self.hash32 = farmhash.hash32(self)
         super().save(*args, **kwargs)
 
     def __str__(self):
         _type = '[' + self.type + ']' if self.type else ''
         return ' '.join(filter(None, [self.name, self.variety or '', _type]))
+
+    def evaluate_hash(self):
+        return farmhash.hash32(self)
 
 
 class Mixture(models.Model):
@@ -38,38 +40,18 @@ class Mixture(models.Model):
             through='MixtureIngredients',
             )
     # TODO: Evaluate hash based on ingredients and quantities
+    #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
 
     class Meta:
         db_table = 'mixture'
 
-
-class MixtureIngredients(models.Model):
-    UNITS = [
-        ('[gr]', 'grams'),
-        ('[lb]', 'pounds'),
-        ('[oz]', 'ounces'),
-        ('[kg]', 'kilograms'),
-        ('[-]', 'ratio'),
-        ('[%]', 'percentage'),
-        ]
-    mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE)
-    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
-    quantity = UnsignedIntegerField()
-    unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
-
-    class Meta:
-        db_table = 'mixture_ingredients'
-        ordering = ['mixture_id', 'ingredient_id', 'quantity']
-
-    #TODO: Populate ingredient_quantities and derived properties
-    #      in the ``mixture`` instance
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._ingredient_quantities = None
         self._ingredient_normquantities = None
 
-    def update_mixture_hash(self):
+    def update_hash(self):
         hsource = ''
         self.fetch_ingredient_quantities()
         self.normalize_ingredients()
@@ -84,7 +66,7 @@ class MixtureIngredients(models.Model):
 
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
-        for mi in self.__class__.objects.filter(mixture=self.mixture):
+        for mi in self.ingredients.through.filter(mixture=self):
             yield (mi.ingredient, mi.quantity)
 
     def fetch_ingredient_quantities(self):
@@ -135,6 +117,26 @@ class MixtureIngredients(models.Model):
         if self._ingredient_normquantities is None:
             self.normalize_ingredients()
         return self._ingredient_normquantities
+
+
+class MixtureIngredients(models.Model):
+    UNITS = [
+        ('[gr]', 'grams'),
+        ('[lb]', 'pounds'),
+        ('[oz]', 'ounces'),
+        ('[kg]', 'kilograms'),
+        ('[-]', 'ratio'),
+        ('[%]', 'percentage'),
+        ]
+    mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE)
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
+    quantity = UnsignedIntegerField()
+    unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
+
+    class Meta:
+        db_table = 'mixture_ingredients'
+        ordering = ['mixture_id', 'ingredient_id', 'quantity']
+
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
