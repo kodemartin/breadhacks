@@ -2,8 +2,9 @@ import farmhash
 
 from django.db import models
 from custom_fields import UnsignedIntegerField
+from custom_models import Hash32Model
 
-class Ingredient(models.Model):
+class Ingredient(Hash32Model):
     TYPES = (
         ('flour', 'flour'),
         ('water', 'water'),
@@ -17,7 +18,6 @@ class Ingredient(models.Model):
     name = models.CharField(max_length=60)
     variety = models.CharField(max_length=60, null=True, default=None)
     type = models.CharField(max_length=60, choices=TYPES)
-    hash32 = UnsignedIntegerField(null=True)
 
     class Meta:
         db_table = 'ingredient'
@@ -30,10 +30,10 @@ class Ingredient(models.Model):
         return ' '.join(filter(None, [self.name, self.variety or '', _type]))
 
     def evaluate_hash(self):
-        return farmhash.hash32(self)
+        return farmhash.hash32(str(self))
 
 
-class Mixture(models.Model):
+class Mixture(Hash32Model):
     label = models.CharField(max_length=128)
     ingredients = models.ManyToManyField(
             Ingredient,
@@ -51,13 +51,18 @@ class Mixture(models.Model):
         self._ingredient_quantities = None
         self._ingredient_normquantities = None
 
-    def update_hash(self):
+    def evaluate_hash(self):
+        """Evaluate the hash of the mixture.
+
+        The evaluation takes into account the ingredients
+        of the mixture and their normalized quantity.
+
+        :rtype: int
+        """
         hsource = ''
-        self.fetch_ingredient_quantities()
-        self.normalize_ingredients()
         for i, norm_quantity in self.ingredient_normquantities:
             hsource += str(i.hash32) + str(norm_quantity)
-        self.mixture.hash32 = farmhash.hash32(hsource)
+        return farmhash.hash32(hsource)
 
     def iter_ingredient_quantities(self):
         """Iterate on couples of ingredients and
@@ -66,7 +71,7 @@ class Mixture(models.Model):
 
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
-        for mi in self.ingredients.through.filter(mixture=self):
+        for mi in self.ingredients.through.objects.filter(mixture=self):
             yield (mi.ingredient, mi.quantity)
 
     def fetch_ingredient_quantities(self):
@@ -137,11 +142,6 @@ class MixtureIngredients(models.Model):
         db_table = 'mixture_ingredients'
         ordering = ['mixture_id', 'ingredient_id', 'quantity']
 
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        self.update_mixture_hash()
-        self.mixture.save()
 
 class Instruction(models.Model):
     label = models.CharField(max_length=128)
