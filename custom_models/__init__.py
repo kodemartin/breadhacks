@@ -1,6 +1,6 @@
 from django.db import models
 
-from customfields import UnsignedIntegerField
+from custom_fields import UnsignedIntegerField
 
 
 class Hash32Model(models.Model):

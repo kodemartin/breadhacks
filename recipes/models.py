@@ -1,7 +1,7 @@
 import farmhash
 
 from django.db import models
-from customfields import UnsignedIntegerField
+from custom_fields import UnsignedIntegerField
 
 class Ingredient(models.Model):
     TYPES = (
