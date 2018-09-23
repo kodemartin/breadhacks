@@ -1,11 +1,16 @@
 import farmhash
 
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
-from .models import Ingredient
+from .models import Ingredient, MixtureIngredients
 
 
 @receiver(pre_save, sender=Ingredient)
 def evaluate_hash(sender, instance, **kwargs):
-    instance.hash32 = 13
+    instance.update_hash()
+
+@receiver(post_save, sender=MixtureIngredients)
+def update_mixture_hash(sender, instance, **kwargs):
+    instance.mixture.update_hash()
+    instance.mixture.save()
