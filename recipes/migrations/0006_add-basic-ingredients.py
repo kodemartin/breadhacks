@@ -24,7 +24,7 @@ def apply(apps, schema_editor):
 
     for name, _type, variety in new_ingredients:
         ingredient = Ingredient(name=name, type=_type, variety=variety)
-        # ingredient.hash32 = hash32(name + (_type or '') + (variety or ''))
+        ingredient.hash32 = ingredient.evaluate_hash()
         ingredient.save()
 
 
