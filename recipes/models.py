@@ -1,6 +1,6 @@
 import farmhash
 
-from django.db import models
+from django.db import models, transaction
 from custom_fields import UnsignedIntegerField
 from custom_models import Hash32Model
 
@@ -126,6 +126,27 @@ class Mixture(Hash32Model):
         if self._ingredient_normquantities is None:
             self.normalize_ingredients()
         return self._ingredient_normquantities
+
+    @classmethod
+    @transaction.atomic
+    def new(cls, title='Overall', mixture_ingredients=None, unit='[gr]'):
+        """Create a new mixture entry by specifying
+        mixture ingredients.
+
+        :param str title:
+        :param mixture_ingredients: A map between ingredients
+            and quantities for this mixture.
+        :type mixture_ingredienst: dict or None
+        """
+        mixture = cls(title=title)
+        mixture.save()
+        if mixture_ingredients:
+            for ingredient, quantity in mixture_ingredients.items():
+                i = Ingredient.objects.get(name=ingredient)
+                mi = MixtureIngredients(mixture=mixture, ingredient=i,
+                                        quantity=quantity, unit=unit)
+                mi.save()
+        return mixture
 
 
 class MixtureIngredients(models.Model):
