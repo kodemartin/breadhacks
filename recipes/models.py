@@ -34,11 +34,11 @@ class Ingredient(Hash32Model):
 
 
 class Mixture(Hash32Model):
-    label = models.CharField(max_length=128)
+    title = models.CharField(max_length=128)
     ingredients = models.ManyToManyField(
-            Ingredient,
-            through='MixtureIngredients',
-            )
+        Ingredient,
+        through='MixtureIngredients',
+        )
     # TODO: Evaluate hash based on ingredients and quantities
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
