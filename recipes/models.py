@@ -90,6 +90,10 @@ class Mixture(Hash32Model):
             self.fetch_ingredient_quantities()
         return self._ingredient_quantities
 
+    @ingredient_quantities.setter
+    def ingredient_quantities(self, value):
+        self._ingredient_quantities = value
+
     def iter_normalize_ingredients(self, ingredient_type='flour'):
         """Normalize ingredient quantities w.r.t the
         total quantity of the ingredients of the
