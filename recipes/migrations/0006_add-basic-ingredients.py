@@ -24,7 +24,10 @@ def apply(apps, schema_editor):
 
     for name, _type, variety in new_ingredients:
         ingredient = Ingredient(name=name, type=_type, variety=variety)
-        ingredient.hash32 = ingredient.evaluate_hash()
+        _type = '[' + _type + ']' if _type else ''
+        ingredient.hash32 = hash32(
+                ' '.join(filter(None, [name, variety or '', _type]))
+                )
         ingredient.save()
 
 

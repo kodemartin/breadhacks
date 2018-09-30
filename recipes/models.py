@@ -32,6 +32,26 @@ class Ingredient(Hash32Model):
     def evaluate_hash(self):
         return farmhash.hash32(str(self))
 
+    @classmethod
+    def get(cls, name, variety=None, _type=None):
+        """Return the instance with the given name,
+        and optionally variety and type.
+        
+        :param str name: The name of the ingredient.
+        :param variety: Filter any results to match
+            the specified variety.
+        :type variety: str or None
+        :param _type: Filter any results to match
+            the specified type.
+        :type type: str or None
+        """
+        q = cls.objects.filter(name=name)
+        if variety:
+            q = q.filter(variety=variety)
+        if type:
+            q = q.filter(type=_type)
+        return q.first()
+
 
 class Mixture(Hash32Model):
     title = models.CharField(max_length=128)
@@ -51,6 +71,40 @@ class Mixture(Hash32Model):
         self._ingredient_quantities = None
         self._ingredient_normquantities = None
 
+    @property
+    def ingredient_normquantities(self):
+        """List of tuples ``(ingredient-instance, normquantity)``.
+
+        :rtype: list
+        """
+        if self._ingredient_normquantities is None:
+            self.normalize_ingredients()
+        return self._ingredient_normquantities
+
+    @property
+    def ingredient_quantities(self):
+        """List of tuples ``(ingredient-instance, quantity)``.
+
+        :rtype: list
+        """
+        if self._ingredient_quantities is None:
+            self.fetch_ingredient_quantities()
+        return self._ingredient_quantities
+
+    @ingredient_quantities.setter
+    def ingredient_quantities(self, value):
+        self._ingredient_quantities = value
+
+    def update_properties(self):
+        """Update hash and properties of the instance."""
+        self.update_hash()
+        self.fetch_ingredient_quantities()
+        self.normalize_ingredients()
+
+    @staticmethod
+    def hash(ingredient_quantity):
+        pass
+        
     def evaluate_hash(self):
         """Evaluate the hash of the mixture.
 
@@ -60,7 +114,7 @@ class Mixture(Hash32Model):
         :rtype: int
         """
         hsource = ''
-        for i, norm_quantity in self.ingredient_normquantities:
+        for i, norm_quantity in self.iter_normalize_ingredients():
             hsource += str(i.hash32) + str(norm_quantity)
         return farmhash.hash32(hsource)
 
@@ -80,24 +134,10 @@ class Mixture(Hash32Model):
         """
         self._ingredient_quantities = list(self.iter_ingredient_quantities())
 
-    @property
-    def ingredient_quantities(self):
-        """List of tuples ``(ingredient-instance, quantity)``.
-
-        :rtype: list
-        """
-        if self._ingredient_quantities is None:
-            self.fetch_ingredient_quantities()
-        return self._ingredient_quantities
-
-    @ingredient_quantities.setter
-    def ingredient_quantities(self, value):
-        self._ingredient_quantities = value
-
-    def iter_normalize_ingredients(self, ingredient_type='flour'):
+    def normalize_ingredients(self, quantities=None, reference='flour'):
         """Normalize ingredient quantities w.r.t the
         total quantity of the ingredients of the
-        specified ``ingredient_type``. If no such ingredient
+        specified ``reference`` type. If no such ingredient
         is found, quantities are normalized w.r.t.
         the maximum quantity of the existing
         ingredients.
@@ -105,43 +145,37 @@ class Mixture(Hash32Model):
         This conveniently yields the baker's ratio
         if we normalize w.r.t. flour-ingredients.
 
-        :param str ingredient_type:
+        :param quantities: A map ``{<Ingredient>: quantity}``.
+        :type quantities: dict or None
+        :param str reference:
         :return: An iterator of tuples ``(ingredient_instance, normalized_value)``.
         """
-        total = sum(quantity for (i, quantity) in self.ingredient_quantities if
+        quantities = quantities or dict(self.iter_ingredient_quantities())
+        total = sum(quantity for (i, quantity) in self.quantities if
                     i.type==ingredient_type)
         total = total or max(self.ingredient_quantities, key=lambda t: t[1])[1]
-        for i, quantity in self.ingredient_quantities:
+        for i, quantity in self.iter_ingredient_quantities():
             yield i, quantity/total
 
     def normalize_ingredients(self):
         self._ingredient_normquantities = list(self.iter_normalize_ingredients())
 
-    @property
-    def ingredient_normquantities(self):
-        """List of tuples ``(ingredient-instance, normquantity)``.
-
-        :rtype: list
-        """
-        if self._ingredient_normquantities is None:
-            self.normalize_ingredients()
-        return self._ingredient_normquantities
-
     @classmethod
     @transaction.atomic
-    def new(cls, title='Overall', mixture_ingredients=None, unit='[gr]'):
+    def new(cls, title='Overall', ingredient_quantity=None, unit='[gr]'):
         """Create a new mixture entry by specifying
         mixture ingredients.
 
         :param str title:
-        :param mixture_ingredients: A map between ingredients
+        :param ingredient_quantity: A map between ingredients
             and quantities for this mixture.
-        :type mixture_ingredienst: dict or None
+        :type ingredient_quantity: dict or None
+        :rtype: Mixture
         """
         mixture = cls(title=title)
         mixture.save()
-        if mixture_ingredients:
-            for ingredient, quantity in mixture_ingredients.items():
+        if ingredient_quantity:
+            for ingredient, quantity in ingredient_quantity.items():
                 i = Ingredient.objects.get(name=ingredient)
                 mi = MixtureIngredients(mixture=mixture, ingredient=i,
                                         quantity=quantity, unit=unit)
