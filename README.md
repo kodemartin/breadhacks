@@ -44,3 +44,18 @@ Create, handle, and store bread-recipes.
         sudo chown -R $USER:$USER .
 
     so that ownership of the files is assigned to the current user.
+
+
+* Grant the user `baker` the necessary permissions to create the test-database
+
+  1. Login:
+
+        docker-exec -it docker-mysql mysql -u<username> -p<password> breadhacks
+
+  2. Grant permissions:
+
+        mysql > GRANT ALL ON *.* to 'baker'@'%';
+
+* Run tests:
+
+        docker-exec django-project python manage.py test
