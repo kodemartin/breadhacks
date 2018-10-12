@@ -164,8 +164,8 @@ class Mixture(Hash32Model):
         mixture ingredients.
 
         :param str title:
-        :param ingredient_quantity: A map between ingredients
-            and quantities for this mixture.
+        :param ingredient_quantity: A map between ingredient properties
+            ``(name, [variety, type])`` and quantities for this mixture.
         :type ingredient_quantity: dict or None
         :rtype: Mixture
         """
@@ -173,7 +173,9 @@ class Mixture(Hash32Model):
         mixture.save()
         if ingredient_quantity:
             for ingredient, quantity in ingredient_quantity.items():
-                i = Ingredient.objects.get(name=ingredient)
+                i = Ingredient.get(*ingredient)
+                if i is None:
+                    raise ValueError(f'Unknown ingredient {ingredient}')
                 mi = MixtureIngredients(mixture=mixture, ingredient=i,
                                         quantity=quantity, unit=unit)
                 mi.save()
