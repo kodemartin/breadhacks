@@ -36,7 +36,7 @@ class Ingredient(Hash32Model):
     def get(cls, name, variety=None, _type=None):
         """Return the instance with the given name,
         and optionally variety and type.
-        
+
         :param str name: The name of the ingredient.
         :param variety: Filter any results to match
             the specified variety.
@@ -48,7 +48,7 @@ class Ingredient(Hash32Model):
         q = cls.objects.filter(name=name)
         if variety:
             q = q.filter(variety=variety)
-        if type:
+        if _type:
             q = q.filter(type=_type)
         return q.first()
 
@@ -114,7 +114,7 @@ class Mixture(Hash32Model):
         :rtype: int
         """
         hsource = ''
-        for i, norm_quantity in self.iter_normalize_ingredients():
+        for i, norm_quantity in self.normalize_ingredients():
             hsource += str(i.hash32) + str(norm_quantity)
         return farmhash.hash32(hsource)
 
@@ -151,14 +151,11 @@ class Mixture(Hash32Model):
         :return: An iterator of tuples ``(ingredient_instance, normalized_value)``.
         """
         quantities = quantities or dict(self.iter_ingredient_quantities())
-        total = sum(quantity for (i, quantity) in self.quantities if
-                    i.type==ingredient_type)
+        total = sum((quantity for (i, quantity) in quantities.items() if
+                    i.type==reference))
         total = total or max(self.ingredient_quantities, key=lambda t: t[1])[1]
         for i, quantity in self.iter_ingredient_quantities():
             yield i, quantity/total
-
-    def normalize_ingredients(self):
-        self._ingredient_normquantities = list(self.iter_normalize_ingredients())
 
     @classmethod
     @transaction.atomic
