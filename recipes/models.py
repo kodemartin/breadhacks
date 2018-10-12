@@ -4,6 +4,9 @@ from django.db import models, transaction
 from custom_fields import UnsignedIntegerField
 from custom_models import Hash32Model
 
+import pprint
+
+
 class Ingredient(Hash32Model):
     TYPES = (
         ('flour', 'flour'),
@@ -180,6 +183,9 @@ class Mixture(Hash32Model):
                                         quantity=quantity, unit=unit)
                 mi.save()
         return mixture
+
+    def __str__(self):
+        return pprint.pformat({f'{i}': q for i, q in self.ingredient_quantities })
 
 
 class MixtureIngredients(models.Model):
