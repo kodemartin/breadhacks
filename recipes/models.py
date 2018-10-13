@@ -263,6 +263,31 @@ class Mixture(Hash32Model):
     def __str__(self):
         return pprint.pformat({f'{i}': q for i, q in self.ingredient_quantities })
 
+    @transaction.atomic
+    def __add__(self, other):
+        result = Mixture(title=self.title)
+        result.save()
+        iqself = dict(self.ingredient_quantities)
+        iqother = dict(other.ingredient_quantities)
+        for ingredient in set(iqself).union(iqother):
+            quantity = iqself.get(ingredient, 0.) + iqother.get(ingredient, 0.)
+            result.add(ingredient, quantity)
+        result.update_properties()
+        result.save()
+        return result
+
+    @transaction.atomic
+    def __sub__(self, other):
+        result = Mixture(title=self.title)
+        result.save()
+        iqother = dict(other.ingredient_quantities)
+        for ingredient, quantity in self.ingredient_quantities:
+            quantity = quantity - iqother.get(ingredient, 0.)
+            result.add(ingredient, quantity)
+        result.update_properties()
+        result.save()
+        return result
+
 
 class MixtureIngredients(models.Model):
     UNITS = [

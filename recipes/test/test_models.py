@@ -69,3 +69,25 @@ class TestMixture(TestCase):
         with self.assertRaises(Exception):
             m = Mixture.new(ingredient_quantity=iq)
         self.assertIsNone(Mixture.objects.all().first())
+
+    def test_add(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        m2 = Mixture.new(ingredient_quantity=self.m2)
+        m = m1 + m2
+        expected = {
+            Ingredient.get('Bread flour'): 2000, 
+            Ingredient.get('Water'): 1400,
+            Ingredient.get('Salt'): 38
+            }
+        self.assertDictEqual(dict(m.ingredient_quantities), expected)
+
+    def test_sub(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        m2 = Mixture.new(ingredient_quantity=self.m2)
+        m = m1 - m2
+        expected = {
+            Ingredient.get('Bread flour'): 0,
+            Ingredient.get('Water'): 0,
+            Ingredient.get('Salt'): 2
+            }
+        self.assertDictEqual(dict(m.ingredient_quantities), expected)
