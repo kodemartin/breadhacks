@@ -146,6 +146,10 @@ class Mixture(Hash32Model):
 
         return self.evaluate_hash_static(dict(quantities))
 
+    def iter_mixture_ingredients(self):
+        for mi in self.ingredients.through.objects.filter(mixture=self):
+            yield mi
+
     def iter_ingredient_quantities(self):
         """Iterate on couples of ingredients and
         respective quantities that make up this
@@ -153,7 +157,7 @@ class Mixture(Hash32Model):
 
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
-        for mi in self.ingredients.through.objects.filter(mixture=self):
+        for mi in self.iter_mixture_ingredients():
             yield (mi.ingredient, mi.quantity)
 
     def cache_ingredient_quantities(self):
