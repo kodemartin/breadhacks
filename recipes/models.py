@@ -65,6 +65,7 @@ class Mixture(Hash32Model):
         Ingredient,
         through='MixtureIngredients',
         )
+    mixtures = models.ManyToManyField('Mixture')
     # TODO: Evaluate hash based on ingredients and quantities
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
