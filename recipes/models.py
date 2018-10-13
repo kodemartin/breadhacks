@@ -55,6 +55,9 @@ class Ingredient(Hash32Model):
             q = q.filter(type=_type)
         return q.first()
 
+    def __hash__(self):
+        return self.hash32
+
 
 class Mixture(Hash32Model):
     title = models.CharField(max_length=128)
