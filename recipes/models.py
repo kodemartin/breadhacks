@@ -316,21 +316,52 @@ class Instruction(models.Model):
         db_table = 'instruction'
 
 
-class Recipe(models.Model):
+class Recipe(Hash32Model):
     title = models.CharField(max_length=128)
-    mixture = models.ManyToManyField(
+    mixtures = models.ManyToManyField(
             Mixture,
-            db_table='recipe_mixtures'
+            db_table='recipe_mixture'
             )
-    instruction = models.ManyToManyField(
+    instructions = models.ManyToManyField(
             Instruction,
-            db_table='recipe_instructions'
+            db_table='recipe_instruction'
             )
     # TODO: Evaluate hash based on mixtures and instructions
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.overall = None
+        self.final = None
+        self.additional = []
+
     class Meta:
         db_table = 'recipe'
+
+    def add_overall_mixture(self, ingredient_quantity, unit='[gr]'):
+        """
+        :param dict ingredient_quantity:
+        :param str unit:
+        """
+        self.overall = Mixture.new('Overall', ingredient_quantity, unit)
+        self.mixtures.add(self.overall)
+
+    def add_additional_mixture(self, ingredient_quantity, unit='[gr]'):
+        """
+        :param dict ingredient_quantity:
+        :param str unit:
+        """
+        to_add = Mixture.new('Overall', ingredient_quantity, unit)
+        self.mixtures.add(to_add)
+        self.additional.append(to_add)
+
+    def calculate_final(self):
+        self.final = self.overall
+        for mixture in self.additional:
+            self.final -= Mixture
+        self.final.title = 'Final'
+        self.final.update_properties()
+        self.final.save()
 
 
 class Implementation(models.Model):
