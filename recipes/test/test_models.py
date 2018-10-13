@@ -27,14 +27,28 @@ class TestMixture(TestCase):
             ('Water',): 700,
             ('Salt',): 18
             }
+        self.m3 = dict(self.m1)
+        self.m3[('Durum wheat', )] = 110.
 
     def test_new(self):
         m = Mixture.new(ingredient_quantity=self.m1)
         self.assertIsInstance(m, Mixture)
-        mstored = Mixture.objects.get(id=1)
+        mstored = Mixture.objects.get(pk=m.id)
         actual = {(i.name,): q for i, q in mstored.ingredient_quantities}
         self.assertDictEqual(actual, self.m1)
         m2 = Mixture.new(ingredient_quantity=self.m2)
+        self.assertIsInstance(m2, Mixture)
+
+    def test_get_duplicate(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        instance_quantity = Mixture.construct_instance_quantity(self.m1)
+        m = Mixture.get_duplicate(instance_quantity)
+        self.assertEqual(m.id, m1.id)
+        self.assertEqual(m.hash32, m1.hash32)
+
+    def test_new_extension(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        m2 = Mixture.new(ingredient_quantity=self.m3)
         self.assertIsInstance(m2, Mixture)
 
     def test_new_assert_raises(self):
