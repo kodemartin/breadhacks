@@ -50,11 +50,11 @@ Create, handle, and store bread-recipes.
 
   1. Login:
 
-        docker-exec -it docker-mysql mysql -u<username> -p<password> breadhacks
+            docker-exec -it docker-mysql mysql -u<username> -p<password> breadhacks
 
   2. Grant permissions:
 
-        mysql > GRANT ALL ON *.* to 'baker'@'%';
+            mysql > GRANT ALL ON *.* to 'baker'@'%';
 
 * Run tests:
 
