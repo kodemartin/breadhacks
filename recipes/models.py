@@ -2,7 +2,7 @@ import farmhash
 
 from django.db import models, transaction
 from custom_fields import UnsignedIntegerField
-from custom_models import Hash32Model
+from custom_models import Hash32Model, update_properties_and_save
 
 import pprint
 
@@ -111,7 +111,7 @@ class Mixture(Hash32Model):
 
     def update_properties(self):
         """Update hash and properties of the instance."""
-        self.update_hash()
+        super().update_properties()
         self.cache_normalized()
 
     @classmethod
@@ -216,7 +216,8 @@ class Mixture(Hash32Model):
         mixture.save()
         return mixture
 
-    def add(self, ingredient, quantity, unit='[gr]', atomic=False):
+    @update_properties_and_save
+    def add(self, ingredient, quantity, unit='[gr]', *, atomic=False):
         """Add an ingredient-quantity pair to the mix.
 
         :param Ingredient ingredient:
