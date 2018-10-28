@@ -65,7 +65,7 @@ class Mixture(Hash32Model):
         Ingredient,
         through='MixtureIngredients',
         )
-    mixtures = models.ManyToManyField('Mixture')
+    mixtures = models.ManyToManyField('self')
     # TODO: Evaluate hash based on ingredients and quantities
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
@@ -148,8 +148,12 @@ class Mixture(Hash32Model):
         return self.evaluate_hash_static(dict(quantities))
 
     def iter_mixture_ingredients(self):
-        for mi in self.ingredients.through.objects.filter(mixture=self):
+        through = self.ingredients.through.objects
+        for mi in through.filter(mixture=self):
             yield mi
+        for m in self.mixtures.all():
+            for mi in through.filter(mixture=m):
+                yield mi
 
     def iter_ingredient_quantities(self):
         """Iterate on couples of ingredients and
@@ -161,11 +165,27 @@ class Mixture(Hash32Model):
         for mi in self.iter_mixture_ingredients():
             yield (mi.ingredient, mi.quantity)
 
+    def aggregate_ingredient_quantities(self):
+        """Add together quantities of ingredients common
+        to nested mixtures.
+
+        :rtype: dict
+        """
+        aggregate_quantities = {}
+        for ingredient, quantity in self.iter_ingredient_quantities():
+            if ingredient in aggregate_quantities:
+                aggregate_quantities[ingredient] += quantity
+            else:
+                aggregate_quantities[ingredient] = quantity
+        return aggregate_quantities
+
     def cache_ingredient_quantities(self):
         """Update cache of db-stored ingredient
         quantities.
         """
-        self._ingredient_quantities = list(self.iter_ingredient_quantities())
+        self._ingredient_quantities = list(
+            self.aggregate_ingredient_quantities().items()
+            )
 
     @staticmethod
     def normalize_ingredients(quantities, reference='flour'):
@@ -230,9 +250,30 @@ class Mixture(Hash32Model):
         mi = MixtureIngredients(mixture=self, ingredient=ingredient,
                                 quantity=quantity, unit=unit)
         mi.save()
-        if atomic:
-            self.update_properties()
-            self.save()
+
+    @update_properties_and_save
+    def add_mixture(self, mixtures, *, atomic=False):
+        """Add a nested mixture.
+
+        :param Mixture mixture: The ``Mixture`` instance
+            to add.
+        :param bool atomic: If ``True`` update the dependent
+            properties of the mixture.
+        """
+        for m in mixtures:
+            self.mixtures.add(m)
+
+    @update_properties_and_save
+    def add_mixtures(self, mixtures, *, atomic=False):
+        """Add multiple nested mixtures.
+
+        :param iterable mixtures: The sequence of ``Mixture`` instances
+            to add.
+        :param bool atomic: If ``True`` update the dependent
+            properties of the mixture.
+        """
+        for m in mixtures:
+            self.mixtures.add(m)
 
     @staticmethod
     def construct_instance_quantity(ingredient_quantity):

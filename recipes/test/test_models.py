@@ -91,3 +91,16 @@ class TestMixture(TestCase):
             Ingredient.get('Salt'): 2
             }
         self.assertDictEqual(dict(m.ingredient_quantities), expected)
+
+    def test_nested_mixture(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        initial_hash = m1.hash32
+        m2 = Mixture.new(ingredient_quantity=self.m2)
+        m1.add_mixtures((m2, ), atomic=True)
+        expected = {
+            Ingredient.get('Bread flour'): 2000,
+            Ingredient.get('Water'): 1400,
+            Ingredient.get('Salt'): 38
+            }
+        self.assertDictEqual(dict(m1.ingredient_quantities), expected)
+        self.assertNotEqual(m1.hash32, initial_hash)
