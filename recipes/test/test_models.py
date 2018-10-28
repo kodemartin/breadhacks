@@ -116,3 +116,17 @@ class TestMixture(TestCase):
             }
         self.assertDictEqual(dict(m1.ingredient_quantities), expected)
         self.assertNotEqual(m1.hash32, initial_hash)
+
+
+class TestRecipe(TestCase):
+
+    def setUp(self):
+        self.overall = {
+            ('Bread flour',): 1000,
+            ('Water',): 700,
+            ('Salt',): 20
+            }
+        self.culture = {
+            ('Bread flour',): 1000,
+            ('Water',): 600,
+            }

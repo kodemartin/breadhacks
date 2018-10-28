@@ -371,13 +371,13 @@ class Instruction(models.Model):
 class Recipe(Hash32Model):
     title = models.CharField(max_length=128)
     mixtures = models.ManyToManyField(
-            Mixture,
-            db_table='recipe_mixture'
-            )
+        Mixture,
+        db_table='recipe_mixture'
+        )
     instructions = models.ManyToManyField(
-            Instruction,
-            db_table='recipe_instruction'
-            )
+        Instruction,
+        db_table='recipe_instruction'
+        )
     # TODO: Evaluate hash based on mixtures and instructions
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
 
@@ -385,23 +385,43 @@ class Recipe(Hash32Model):
         super().__init__(*args, **kwargs)
         self.overall = None
         self.final = None
-        self.additional = []
+        self.deductible = []
 
     class Meta:
         db_table = 'recipe'
 
-    def add_overall_mixture(self, ingredient_quantity, unit='[gr]'):
-        """
+    def evaluate_hash(self):
+        if self.overall:
+            h = self.overall.hash32
+            for m in self.deductible:
+                h += m.hash32
+            return h
+
+    @update_properties_and_save
+    def add_overall_formula(self, ingredient_quantity, unit='[gr]',
+                            mixtures=None, *, atomic=True):
+        """Instantiate the overall formula of the recipe.
+
         :param dict ingredient_quantity:
         :param str unit:
+        :param mixtures:
+        :type mixtures: iterable(Mixture) or None
         """
-        self.overall = Mixture.new('Overall', ingredient_quantity, unit)
+        self.overall = Mixture.new('Overall', ingredient_quantity, unit,
+                                   mixtures)
         self.mixtures.add(self.overall)
 
-    def add_additional_mixture(self, ingredient_quantity, unit='[gr]'):
-        """
+    @update_properties_and_save
+    def add_deductible_mixture(self, title, ingredient_quantity, unit='[gr]',
+                               mixtures=None, *, atomic=True):
+        """Add a mixture that needs to be prepared independently, and can
+        be deducted from the overall formula.
+
+        :param str title: Title of the mixture.
         :param dict ingredient_quantity:
         :param str unit:
+        :param mixtures:
+        :type mixtures: iterable(Mixture) or None
         """
         to_add = Mixture.new('Overall', ingredient_quantity, unit)
         self.mixtures.add(to_add)
@@ -409,7 +429,7 @@ class Recipe(Hash32Model):
 
     def calculate_final(self):
         self.final = self.overall
-        for mixture in self.additional:
+        for mixture in self.deductible:
             self.final -= Mixture
         self.final.title = 'Final'
         self.final.update_properties()
