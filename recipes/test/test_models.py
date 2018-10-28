@@ -70,6 +70,18 @@ class TestMixture(TestCase):
             m = Mixture.new(ingredient_quantity=iq)
         self.assertIsNone(Mixture.objects.all().first())
 
+    def test_new_nested_mixtures(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        m2 = Mixture.new(ingredient_quantity=self.m2, mixtures=(m1, ))
+        m3 = Mixture.new(ingredient_quantity=self.m3, mixtures=(m2, ))
+        expected = {
+            Ingredient.get('Bread flour'): 2000,
+            Ingredient.get('Water'): 1400,
+            Ingredient.get('Salt'): 38,
+            Ingredient.get('Durum wheat'): 110.
+            }
+        self.assertDictEqual(dict(m3.ingredient_quantities), expected)
+
     def test_add(self):
         m1 = Mixture.new(ingredient_quantity=self.m1)
         m2 = Mixture.new(ingredient_quantity=self.m2)

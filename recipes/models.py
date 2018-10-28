@@ -212,7 +212,8 @@ class Mixture(Hash32Model):
 
     @classmethod
     @transaction.atomic
-    def new(cls, title='Overall', ingredient_quantity=None, unit='[gr]'):
+    def new(cls, title='Overall', ingredient_quantity=None, unit='[gr]',
+            mixtures=None):
         """Create a new mixture entry by specifying
         mixture ingredients.
 
@@ -220,6 +221,8 @@ class Mixture(Hash32Model):
         :param ingredient_quantity: A map between ingredient properties
             ``(name, [variety, type])`` and quantities for this mixture.
         :type ingredient_quantity: dict or None
+        :param mixtures: Sequence of nested 'Mixture' instances.
+        :type mixtures: iterable or None
         :rtype: Mixture
         """
         instance_quantity = cls.construct_instance_quantity(ingredient_quantity)
@@ -232,6 +235,8 @@ class Mixture(Hash32Model):
         if ingredient_quantity:
             for instance, quantity in instance_quantity.items():
                 mixture.add(instance, quantity, unit)
+        if mixtures:
+            mixture.add_mixtures(mixtures)
         mixture.update_properties()
         mixture.save()
         return mixture
