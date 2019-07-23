@@ -50,7 +50,7 @@ Create, handle, and store bread-recipes.
 
   1. Login:
 
-            docker-exec -it docker-mysql mysql -u<username> -p<password> breadhacks
+            docker exec -it docker-mysql mysql -u<username> -p<password> breadhacks
 
   2. Grant permissions:
 
@@ -58,4 +58,4 @@ Create, handle, and store bread-recipes.
 
 * Run tests:
 
-        docker-exec django-project python manage.py test
+        docker exec django-project python manage.py test
