@@ -4,7 +4,7 @@ from .models import Ingredient
 
 # Create your views here.
 def ingredients(request):
-    ingredients = Ingredient.objects.order_by('type')
+    ingredients = Ingredient.objects.order_by('type', 'name', 'variety')
 
     # Classify the ingredients according to type
     ingredients_per_type = {}
