@@ -1,0 +1,66 @@
+{% extends 'ingredients/base.html' %}
+
+{% block content %}
+<!-- Container -->
+<div id="container">
+    <!-- Header -->
+    <div id="header">
+        <div id="branding">
+	    <h1 id="site-name">{{header|title}}</h1>
+        </div>
+        <!--div id="user-tools">
+                Welcome,
+                <strong>root</strong>.
+                    <a href="/">View site</a> /
+                <a href="/admin/password_change/">Change password</a> /
+                <a href="/admin/logout/">Log out</a>
+        </div-->
+    </div>
+    <!-- END Header -->
+
+    <!-- Content -->
+    <div id="content" class="colMS">
+        <h1>Ingredients by type</h1> 
+	<div id="content-main"> 
+	    <div class="app-auth module">
+		{% for type, subset in ingredients.items %}
+		<table>
+
+		    <caption>
+			{{type}}
+		    </caption>
+
+		    {% for ingredient in subset %}
+
+
+		    <tr class="model-group">
+			<th scope="row">{{ ingredient }}</th>
+			<!--td><a href="/admin/auth/group/add/" class="addlink">Add</a></td>
+			<td><a href="/admin/auth/group/" class="changelink">Change</a></td-->
+		    </tr>
+
+		    {% endfor %}
+
+		</table>
+		<br class="clear">
+		{% endfor %}
+	    </div>
+	</div>
+
+        
+<!--div id="content-related">
+    <div class="module" id="recent-actions-module">
+        <h2>Recent actions</h2>
+        <h3>My actions</h3>
+            <p>None available</p>
+    </div>
+</div-->
+
+        <br class="clear">
+    </div>
+    <!-- END Content -->
+
+    <div id="footer"></div>
+</div>
+<!-- END Container -->
+{% endblock %}
