@@ -350,7 +350,7 @@ class MixtureIngredients(models.Model):
         ('[-]', 'ratio'),
         ('[%]', 'percentage'),
         ]
-    mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE)
+    mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE, blank=True)
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
     quantity = UnsignedIntegerField()
     unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
