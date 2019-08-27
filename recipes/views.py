@@ -1,5 +1,7 @@
+from django.http import HttpResponse
 from django.shortcuts import render
 
+from .forms import MixtureForm, IngredientFormset
 from .models import Ingredient
 
 # Create your views here.
@@ -18,3 +20,17 @@ def ingredients(request):
     context = {'ingredients': ingredients_per_type,
                'header': 'Available ingredients'}
     return render(request, 'ingredients/list.html', context)
+
+
+def new_mixture(request):
+    if request.method == 'POST':
+        form = MixtureForm(request.POST)
+        formset = IngredientFormset(request.POST)
+        if all([form.is_valid(), formset.is_valid()]):
+            return HttpResponse('Congrats. You entered a valid mixture.')
+    else:
+        form = MixtureForm()
+        formset = IngredientFormset()
+
+    return render(request, 'mixtures/new.html',
+            {'formset': formset, 'form': form, 'header': 'Add new mixture'})

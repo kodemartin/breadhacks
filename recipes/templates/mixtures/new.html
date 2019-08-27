@@ -1,0 +1,39 @@
+{% extends "../base.html" %}
+{% load static %}
+
+{% block content %}
+<div class='container'>
+<form action="/recipes/mixture/new/" method="post">
+    {% csrf_token %}
+    <div class='form-inline'>
+        <div class='form-group'>
+            {{form}}
+        </div>
+    </div>
+    {{formset.management_form}}
+    <div class='form-inline'>
+    {% for f in formset %}
+        <div class='form-row'>
+            <div class='ingredient-input'>
+                <div class='form-group'>
+                {{f}}
+                </div>
+            </div>
+            <div class='ingredient-input-append'>
+                <button class='btn btn-success btn-sm add-ingredient'>
+                    <span class='fa fa-plus'></span>
+                </button>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+    <div class='row spacer'>
+        <button type="submit" class="btn btn-primary btn-block">
+            Add mixture
+        </button>
+    </div>
+</form>
+</div>
+
+<script type='text/javascript' src="{% static 'mixtures/js/ingredients.js' %}"></script>
+{% endblock %}

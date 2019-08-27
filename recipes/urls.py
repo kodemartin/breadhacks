@@ -5,4 +5,5 @@ from . import views
 urlpatterns = [
     re_path(r'^ingredients/(?:$|index/$)', views.ingredients,
             name='ingredients-index'),
+    path('mixture/new/', views.new_mixture, name='mixture-new')
 ]
