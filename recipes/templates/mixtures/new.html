@@ -14,22 +14,23 @@
     <div class='form-inline'>
     {% for f in formset %}
         <div class='form-row'>
-            <div class='ingredient-input'>
-                <div class='form-group'>
-                {{f}}
-                </div>
+            <div class='form-group'>
+            {{f}}
             </div>
-            <div class='ingredient-input-append'>
-                <button class='btn btn-success btn-sm add-ingredient'>
-                    <span class='fa fa-plus'></span>
-                </button>
-            </div>
+            <button class='btn btn-outline-danger btn-sm remove-ingredient'>
+                <span class='fa fa-minus'></span>
+            </button>
         </div>
     {% endfor %}
     </div>
-    <div class='row spacer'>
-        <button type="submit" class="btn btn-primary btn-block">
-            Add mixture
+    <div class='row'>
+        <button class="btn btn-outline-success btn-sm add-ingredient my-2">
+            <span class='fa fa-plus'></span>Add ingredient
+        </button>
+    </div>
+    <div class='row'>
+        <BUTTon type="submit" class="btn btn-primary btn-sm btn-block my-4">
+            Submit mixture
         </button>
     </div>
 </form>

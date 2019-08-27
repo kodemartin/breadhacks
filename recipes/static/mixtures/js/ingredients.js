@@ -30,16 +30,18 @@ function cloneMore(selector, prefix) {
     total++;
     $('#id_' + prefix + '-TOTAL_FORMS').val(total);
     $(selector).after(newElement);
-    var conditionRow = $('.form-row:not(:last)');
-    conditionRow.find('.btn.add-ingredient')
-    .removeClass('btn-success').addClass('btn-danger')
-    .removeClass('add-ingredient').addClass('remove-ingredient')
-    .html('<span class="fa fa-minus"></span>')
+    /*var conditionRow = $('.form-row:not(:last)');
+    *conditionRow.find('.btn.add-ingredient')
+    *.removeClass('btn-success').addClass('btn-danger')
+    *.removeClass('add-ingredient').addClass('remove-ingredient')
+    *.html('<span class="fa fa-minus"></span>')
+    */
     return false;
 }
 function deleteForm(prefix, btn) {
     var total = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
-    if (total > 1){
+    console.log(total);
+    if (total > 2){
             btn.closest('.form-row').remove();
             var forms = $('.form-row');
             $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
@@ -48,11 +50,12 @@ function deleteForm(prefix, btn) {
                                         updateElementIndex(this, prefix, i);
                                     });
                     }
-        }
+    } else {
+        alert("More than two ingredients are required...");
+    }
     return false;
 }
 $(document).on('click', '.add-ingredient', function(e){
-    console.log("Whatever");
     e.preventDefault();
     cloneMore('.form-row:last', 'form');
     return false;
