@@ -1,37 +1,53 @@
 {% extends "../base.html" %}
 {% load static %}
+{% load widget_tweaks %}
 
 {% block content %}
 <div class='container'>
 <form action="/recipes/mixture/new/" method="post">
     {% csrf_token %}
-    <div class='form-inline'>
-        <div class='form-group'>
-            {{form}}
-        </div>
+    <div class='form-row'>
+    <div class='col-3'>
+        {% for field in form %}
+            {{field.errors}}
+            <label class="sr-only" for={{field.id_for_label}}>
+                {{field.label}}
+            </label>
+            {{field|add_class:"form-control"|attr:"placeholder:Mixture title"}}
+        {% endfor %}
+    </div>
     </div>
     {{formset.management_form}}
-    <div class='form-inline'>
     {% for f in formset %}
-        <div class='form-row'>
-            <div class='form-group'>
-            {{f}}
-            </div>
-            <button class='btn btn-outline-danger btn-sm remove-ingredient'>
+        <div class='form-row form-dynamic mt-1'>
+            {% for field in f %}
+                <div class='col'>
+                    {{field.errors}}
+                    <label class="sr-only" for={{field.id_for_label}}>
+                        {{field.label}}
+                    </label>
+                    {{field|add_class:"form-control mr-1"}}
+                </div>
+            {% endfor %}
+            <button class='btn btn-outline-danger btn-sm remove-ingredient
+            mt-auto ml-1'>
                 <span class='fa fa-minus'></span>
             </button>
         </div>
     {% endfor %}
-    </div>
     <div class='row'>
+        <div class='col-2'>
         <button class="btn btn-outline-success btn-sm add-ingredient my-2">
             <span class='fa fa-plus'></span>Add ingredient
         </button>
+        </div>
     </div>
     <div class='row'>
-        <BUTTon type="submit" class="btn btn-primary btn-sm btn-block my-4">
+        <div class='col'>
+        <button type="submit" class="btn btn-primary btn-sm btn-block my-4">
             Submit mixture
         </button>
+        </div>
     </div>
 </form>
 </div>

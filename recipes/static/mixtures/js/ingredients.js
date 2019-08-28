@@ -42,8 +42,8 @@ function deleteForm(prefix, btn) {
     var total = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
     console.log(total);
     if (total > 2){
-            btn.closest('.form-row').remove();
-            var forms = $('.form-row');
+            btn.closest('.form-dynamic').remove();
+            var forms = $('.form-dynamic');
             $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
             for (var i=0, formCount=forms.length; i<formCount; i++) {
                         $(forms.get(i)).find(':input').each(function() {
@@ -57,7 +57,7 @@ function deleteForm(prefix, btn) {
 }
 $(document).on('click', '.add-ingredient', function(e){
     e.preventDefault();
-    cloneMore('.form-row:last', 'form');
+    cloneMore('.form-dynamic:last', 'form');
     return false;
 });
 $(document).on('click', '.remove-ingredient', function(e){
