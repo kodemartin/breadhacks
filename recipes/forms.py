@@ -1,25 +1,26 @@
-from django.forms import (ModelForm, CharField, modelformset_factory,
-                          formset_factory)
+from django import forms
 
-from .models import Mixture, MixtureIngredients
+from .models import Ingredient, Mixture, MixtureIngredients
 
 
-class MixtureForm(ModelForm):
+class MixtureForm(forms.ModelForm):
 
     class Meta:
         model = Mixture
         fields = ['title']
 
 
-class MixtureIngredientForm(ModelForm):
+class MixtureIngredientForm(forms.ModelForm):
 
-    auto_id = False
+    ingredient = forms.ModelChoiceField(Ingredient.objects,
+                                        empty_label='Choose ingredient...')
+    quantity = forms.IntegerField(min_value=1, initial=100)
 
     class Meta:
         model = MixtureIngredients
         fields = ['ingredient', 'quantity', 'unit']
 
 
-IngredientFormset = formset_factory(
+IngredientFormset = forms.formset_factory(
     MixtureIngredientForm, min_num=2, validate_min=True
     )
