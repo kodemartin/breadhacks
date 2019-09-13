@@ -32,5 +32,6 @@ def new_mixture(request):
         form = MixtureForm()
         formset = IngredientFormset()
 
-    return render(request, 'mixtures/new.html',
-            {'formset': formset, 'form': form, 'header': 'Add new mixture'})
+    return render(request, 'mixtures/new.html', {
+        'formset': formset, 'form': form, 'header': 'Add new mixture'
+        })
