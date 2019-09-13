@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import Ingredient, Mixture, MixtureIngredients
+from .models import Ingredient, Mixture, MixtureIngredient
 
 
 class MixtureForm(forms.ModelForm):
@@ -17,7 +17,7 @@ class MixtureIngredientForm(forms.ModelForm):
     quantity = forms.IntegerField(min_value=1, initial=100)
 
     class Meta:
-        model = MixtureIngredients
+        model = MixtureIngredient
         fields = ['ingredient', 'quantity', 'unit']
 
 

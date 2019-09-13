@@ -61,11 +61,11 @@ class Ingredient(Hash32Model):
 
 class Mixture(Hash32Model):
     title = models.CharField(max_length=128)
-    ingredients = models.ManyToManyField(
+    ingredient = models.ManyToManyField(
         Ingredient,
-        through='MixtureIngredients',
+        through='MixtureIngredient',
         )
-    mixtures = models.ManyToManyField('self')
+    mixture = models.ManyToManyField('self')
     # TODO: Evaluate hash based on ingredients and quantities
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
@@ -341,7 +341,7 @@ class Mixture(Hash32Model):
         return result
 
 
-class MixtureIngredients(models.Model):
+class MixtureIngredient(models.Model):
     UNITS = [
         ('[gr]', 'grams'),
         ('[lb]', 'pounds'),
@@ -356,7 +356,7 @@ class MixtureIngredients(models.Model):
     unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
 
     class Meta:
-        db_table = 'mixture_ingredients'
+        db_table = 'mixture_ingredient'
         ordering = ['mixture_id', 'ingredient_id', 'quantity']
 
 
