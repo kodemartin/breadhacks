@@ -252,7 +252,7 @@ class Mixture(Hash32Model):
             properties of the mixture.
         :rtype: None
         """
-        mi = MixtureIngredients(mixture=self, ingredient=ingredient,
+        mi = MixtureIngredient(mixture=self, ingredient=ingredient,
                                 quantity=quantity, unit=unit)
         mi.save()
 
