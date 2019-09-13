@@ -60,6 +60,14 @@ class Ingredient(Hash32Model):
 
 
 class Mixture(Hash32Model):
+    UNITS = [
+        ('[gr]', 'grams'),
+        ('[lb]', 'pounds'),
+        ('[oz]', 'ounces'),
+        ('[kg]', 'kilograms'),
+        ('[-]', 'ratio'),
+        ('[%]', 'percentage'),
+        ]
     title = models.CharField(max_length=128)
     ingredient = models.ManyToManyField(
         Ingredient,
@@ -69,6 +77,7 @@ class Mixture(Hash32Model):
     # TODO: Evaluate hash based on ingredients and quantities
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
+    unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
 
     class Meta:
         db_table = 'mixture'
@@ -221,6 +230,7 @@ class Mixture(Hash32Model):
         :param ingredient_quantity: A map between ingredient properties
             ``(name, [variety, type])`` and quantities for this mixture.
         :type ingredient_quantity: dict or None
+        :param str unit: The unit of the quantities specified.
         :param mixtures: Sequence of nested 'Mixture' instances.
         :type mixtures: iterable or None
         :rtype: Mixture
@@ -234,7 +244,7 @@ class Mixture(Hash32Model):
         mixture.save()
         if ingredient_quantity:
             for instance, quantity in instance_quantity.items():
-                mixture.add(instance, quantity, unit)
+                mixture.add(instance, quantity)
         if mixtures:
             mixture.add_mixtures(mixtures)
         mixture.update_properties()
@@ -242,18 +252,17 @@ class Mixture(Hash32Model):
         return mixture
 
     @update_properties_and_save
-    def add(self, ingredient, quantity, unit='[gr]', *, atomic=False):
+    def add(self, ingredient, quantity, *, atomic=False):
         """Add an ingredient-quantity pair to the mix.
 
         :param Ingredient ingredient:
         :param float quantity:
-        :param str unit:
         :param bool atomic: If ``True`` update the dependent
             properties of the mixture.
         :rtype: None
         """
         mi = MixtureIngredient(mixture=self, ingredient=ingredient,
-                                quantity=quantity, unit=unit)
+                               quantity=quantity)
         mi.save()
 
     @update_properties_and_save
@@ -342,18 +351,9 @@ class Mixture(Hash32Model):
 
 
 class MixtureIngredient(models.Model):
-    UNITS = [
-        ('[gr]', 'grams'),
-        ('[lb]', 'pounds'),
-        ('[oz]', 'ounces'),
-        ('[kg]', 'kilograms'),
-        ('[-]', 'ratio'),
-        ('[%]', 'percentage'),
-        ]
     mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE, blank=True)
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
     quantity = UnsignedIntegerField()
-    unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
 
     class Meta:
         db_table = 'mixture_ingredient'
