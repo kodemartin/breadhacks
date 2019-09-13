@@ -18,7 +18,7 @@ class MixtureIngredientForm(forms.ModelForm):
 
     class Meta:
         model = MixtureIngredient
-        fields = ['ingredient', 'quantity', 'unit']
+        fields = ['ingredient', 'quantity']
 
 
 IngredientFormset = forms.formset_factory(
