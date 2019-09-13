@@ -7,7 +7,7 @@ class MixtureForm(forms.ModelForm):
 
     class Meta:
         model = Mixture
-        fields = ['title']
+        fields = ['title', 'unit']
 
 
 class MixtureIngredientForm(forms.ModelForm):
