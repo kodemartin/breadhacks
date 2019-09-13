@@ -288,25 +288,6 @@ class Mixture(Hash32Model):
         for m in mixtures:
             self.mixtures.add(m)
 
-    @staticmethod
-    def construct_instance_quantity(ingredient_quantity):
-        """Given a map between data representing an ingredient
-        and a quantity return the map between the respective
-        ``Ingredient`` instances and the corresponding quantities.
-
-        :param dict ingredient_quantity: A map between ingredient properties
-            ``(name, [variety, type])`` and quantities for this mixture.
-        :rtype: {Ingredient: float}
-        :raises ValueError: If an ingredient description is not recognized.
-        """
-        instance_quantity = {}
-        for ingredient, quantity in ingredient_quantity.items():
-            instance = Ingredient.get(*ingredient)
-            if instance is None:
-                raise ValueError(f'Unknown ingredient {ingredient}')
-            instance_quantity[instance] = quantity
-        return instance_quantity
-
     @classmethod
     def get_duplicate(cls, ingredient_quantity):
         """Given a map between ingredients and quantities
