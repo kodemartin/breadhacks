@@ -157,10 +157,10 @@ class Mixture(Hash32Model):
         return self.evaluate_hash_static(dict(quantities))
 
     def iter_mixture_ingredients(self):
-        through = self.ingredients.through.objects
+        through = self.ingredient.through.objects
         for mi in through.filter(mixture=self):
             yield mi
-        for m in self.mixtures.all():
+        for m in self.mixture.all():
             for mi in through.filter(mixture=m):
                 yield mi
 
@@ -227,24 +227,23 @@ class Mixture(Hash32Model):
         mixture ingredients.
 
         :param str title:
-        :param ingredient_quantity: A map between ingredient properties
-            ``(name, [variety, type])`` and quantities for this mixture.
+        :param ingredient_quantity: A map between `Ingredient` instances
+            and quantities for this mixture.
         :type ingredient_quantity: dict or None
         :param str unit: The unit of the quantities specified.
         :param mixtures: Sequence of nested 'Mixture' instances.
         :type mixtures: iterable or None
         :rtype: Mixture
         """
-        instance_quantity = cls.construct_instance_quantity(ingredient_quantity)
-        mixture = cls.get_duplicate(instance_quantity)
+        mixture = cls.get_duplicate(ingredient_quantity)
         if mixture:
             return mixture
 
-        mixture = cls(title=title)
+        mixture = cls(title=title, unit=unit)
         mixture.save()
         if ingredient_quantity:
-            for instance, quantity in instance_quantity.items():
-                mixture.add(instance, quantity)
+            for ingredient, quantity in ingredient_quantity.items():
+                mixture.add(ingredient, quantity)
         if mixtures:
             mixture.add_mixtures(mixtures)
         mixture.update_properties()
