@@ -1,5 +1,6 @@
-from django.http import HttpResponse
-from django.shortcuts import render
+from django.http import HttpResponse, Http404
+from django.db.models import Q
+from django.shortcuts import render, get_object_or_404
 
 from .forms import MixtureForm, IngredientFormset
 from .models import Ingredient, Mixture
@@ -46,3 +47,10 @@ def new_mixture(request):
     return render(request, 'mixtures/new.html', {
         'formset': formset, 'form': form, 'header': 'Add new mixture'
         })
+
+
+def mixture_preview(request):
+    # TODO: Hanlde POST requests
+    key = request.GET['key']
+    mixture = get_object_or_404(Mixture, Q(id=key) | Q(hash32=key))
+    return HttpResponse(f'Mixture [{mixture.id}-{mixture.hash32}]')
