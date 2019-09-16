@@ -357,7 +357,7 @@ class MixtureIngredient(models.Model):
 
 
 class Instruction(models.Model):
-    label = models.CharField(max_length=128)
+    title = models.CharField(max_length=128)
     text = models.TextField()
 
     class Meta:
@@ -389,8 +389,6 @@ class Recipe(Hash32Model):
     def evaluate_hash(self):
         if self.overall:
             h = self.overall.hash32
-            for m in self.deductible:
-                h += m.hash32
             return h
 
     @update_properties_and_save
@@ -403,7 +401,7 @@ class Recipe(Hash32Model):
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
         """
-        self.overall = Mixture.new('Overall', ingredient_quantity, unit,
+        self.overall = Mixture.new('Overall formula', ingredient_quantity, unit,
                                    mixtures)
         self.mixtures.add(self.overall)
 
@@ -419,14 +417,15 @@ class Recipe(Hash32Model):
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
         """
-        to_add = Mixture.new('Overall', ingredient_quantity, unit)
+        to_add = Mixture.new(title, ingredient_quantity, unit)
         self.mixtures.add(to_add)
-        self.additional.append(to_add)
+        self.deductible.append(to_add)
 
     def calculate_final(self):
+        # TODO: Probably need to deep-copy here
         self.final = self.overall
         for mixture in self.deductible:
-            self.final -= Mixture
+            self.final -= mixture
         self.final.title = 'Final'
         self.final.update_properties()
         self.final.save()
