@@ -276,6 +276,22 @@ class Mixture(Hash32Model):
         for m in mixtures:
             self.mixtures.add(m)
 
+    @classmethod
+    def get_by_key(cls, key):
+        """Return an object by querying the database
+        for the specified key. The method first
+        checks the `id` and then the `hash32` field.
+
+        :param key: The key to lookup
+        :type key: int or str
+        :rtype: Mixture
+        :raises DoesNotExist: If not object is found
+            in the database.
+        """
+        Q = models.Q
+        return cls.objects.get(Q(id=key) | Q(hash32=key))
+
+
     @update_properties_and_save
     def add_mixtures(self, mixtures, *, atomic=False):
         """Add multiple nested mixtures.
