@@ -1,4 +1,4 @@
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, JsonResponse
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
 
@@ -48,11 +48,20 @@ def new_mixture(request):
         'formset': formset, 'form': form, 'header': 'Add new mixture'
         })
 
+
 def new_recipe(request):
     if request.method == 'POST':
-        return HttpResponse(
-            f'Congrats. You entered a valid recipe'
-            )
+        recipe = MixtureForm(request.POST, prefix='recipe')
+        overall = IngredientFormset(request.POST, prefix='overall')
+        if (all([f.is_valid() for f in (recipe, overall)])):
+            return JsonResponse({
+                'recipe': {field.name: field.data for field in recipe},
+                'overall': [{field.name: field.data for field in f} for f in overall]
+                })
+        else:
+            return HttpResponse(
+                f'Problem...'
+                )
     else:
         recipe_form = MixtureForm(prefix='recipe')
         overall_formula = IngredientFormset(prefix='overall')
