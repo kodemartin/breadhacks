@@ -48,6 +48,20 @@ def new_mixture(request):
         'formset': formset, 'form': form, 'header': 'Add new mixture'
         })
 
+def new_recipe(request):
+    if request.method == 'POST':
+        return HttpResponse(
+            f'Congrats. You entered a valid recipe'
+            )
+    else:
+        recipe_form = MixtureForm(prefix='recipe')
+        overall_formula = IngredientFormset(prefix='overall')
+
+    return render(request, 'new.html', {
+        'recipe': recipe_form, 'overall': overall_formula,
+        'header': 'Add new recipe'
+        })
+
 
 def mixture_preview(request):
     # TODO: Hanlde POST requests
