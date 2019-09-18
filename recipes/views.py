@@ -6,7 +6,7 @@ from .forms import MixtureForm, IngredientFormset
 from .models import Ingredient, Mixture
 
 # Create your views here.
-def ingredients(request):
+def list_ingredients(request):
     ingredients = Ingredient.objects.order_by('type', 'name', 'variety')
 
     # Classify the ingredients according to type
