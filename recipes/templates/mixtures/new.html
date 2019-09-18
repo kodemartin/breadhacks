@@ -6,46 +6,48 @@
 <div class='container'>
 <form action="/recipes/mixture/new/" method="post">
     {% csrf_token %}
-    <div class='form-row'>
-        <div class='col-3'>
-            {{form.title.errors}}
-            <label class="sr-only" for={{form.title.id_for_label}}>
-                {{form.title.label}}
-            </label>
-            {{form.title|add_class:"form-control"|attr:"placeholder:Mixture title"}}
-        </div>
-        <div class='col form-inline ml-auto'>
-            {{form.unit.errors}}
-            <label class='pr-1' for={{form.unit.id_for_label}}>
-                {{form.unit.label}}:
-            </label>
-            {{form.unit|add_class:"form-control"}}
-        </div>
-    </div>
-    <div class='formset-dynamic'>
-        {{formset.management_form}}
-        {% for f in formset %}
-            <div class='form-row form-dynamic mt-1'>
-                {% for field in f %}
-                    <div class='col'>
-                        {{field.errors}}
-                        <label class="sr-only" for={{field.id_for_label}}>
-                            {{field.label}}
-                        </label>
-                        {{field|add_class:"form-control mr-1"}}
-                    </div>
-                {% endfor %}
-                <button class='btn btn-outline-danger btn-sm remove-ingredient
-                mt-auto ml-1'>
-                    <span class='fa fa-minus'></span>
-                </button>
+    <div class='nested-mixture-template'>
+        <div class='form-row'>
+            <div class='col-3'>
+                {{form.title.errors}}
+                <label class="sr-only" for={{form.title.id_for_label}}>
+                    {{form.title.label}}
+                </label>
+                {{form.title|add_class:"form-control"|attr:"placeholder:Mixture title"}}
             </div>
-        {% endfor %}
-        <div class='row'>
-            <div class='col-2'>
-            <button class="btn btn-outline-success btn-sm add-ingredient my-2">
-                <span class='fa fa-plus'></span>Add ingredient
-            </button>
+            <div class='col form-inline ml-auto'>
+                {{form.unit.errors}}
+                <label class='pr-1' for={{form.unit.id_for_label}}>
+                    {{form.unit.label}}:
+                </label>
+                {{form.unit|add_class:"form-control"}}
+            </div>
+        </div>
+        <div class='formset-dynamic'>
+            {{formset.management_form}}
+            {% for f in formset %}
+                <div class='form-row form-dynamic mt-1'>
+                    {% for field in f %}
+                        <div class='col'>
+                            {{field.errors}}
+                            <label class="sr-only" for={{field.id_for_label}}>
+                                {{field.label}}
+                            </label>
+                            {{field|add_class:"form-control mr-1"}}
+                        </div>
+                    {% endfor %}
+                    <button class='btn btn-outline-danger btn-sm remove-ingredient
+                    mt-auto ml-1'>
+                        <span class='fa fa-minus'></span>
+                    </button>
+                </div>
+            {% endfor %}
+            <div class='row'>
+                <div class='col-2'>
+                <button class="btn btn-outline-success btn-sm add-ingredient my-2">
+                    <span class='fa fa-plus'></span>Add ingredient
+                </button>
+                </div>
             </div>
         </div>
     </div>

@@ -3,6 +3,8 @@
 {% load widget_tweaks %}
 
 {% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
+
 <div class='container'>
 <form action="/recipes/new/" method="post">
     {% csrf_token %}
@@ -20,7 +22,7 @@
             <label class='pr-1' for={{recipe.unit.id_for_label}}>
                 {{recipe.unit.label}}:
             </label>
-            {{recipe.unit|add_class:"form-control"}}
+            {{recipe.unit|add_class:"form-control"|attr:"id:master-units"}}
         </div>
     </div>
     <div class="mt-3">
@@ -48,9 +50,17 @@
         <div class='row'>
             <div class='col-2'>
             <button class="btn btn-outline-success btn-sm add-ingredient my-2">
-                <span class='fa fa-plus'></span>Add ingredient
+                <span class='fa fa-plus mr-1'></span>Add ingredient
             </button>
             </div>
+        </div>
+    </div>
+    <hr>
+    <div class='row'>
+        <div class='col'>
+            <button class="btn btn-success btn-sm my-2" id="add-mixture">
+                <span class='fa fa-plus mr-1'></span>Add nested mixture
+            </button>
         </div>
     </div>
     <div class='row'>
@@ -64,4 +74,5 @@
 </div>
 
 <script type='text/javascript' src="{% static 'mixtures/js/ingredients.js' %}"></script>
+<script type='text/javascript' src="{% static 'recipes/js/add_nested_mixture.js' %}"></script>
 {% endblock %}
