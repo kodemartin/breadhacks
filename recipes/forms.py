@@ -32,6 +32,22 @@ class MixtureIngredientForm(forms.ModelForm):
         fields = ['ingredient', 'quantity']
 
 
-IngredientFormset = forms.formset_factory(
-    MixtureIngredientForm, min_num=2, validate_min=True
+class CustomFormSet(forms.BaseFormSet):
+
+    def generate_cleaned_data(self, field_names=None):
+        """Generate the cleaned data of the specified or all the
+        field names for each form of the formset.
+
+        :param field_names: An iterable of field names.
+        :type: iterable or None
+        """
+        if self.is_valid():
+            field_names = field_names or list(self.forms[0].fields.keys())
+            for cleaned in self.cleaned_data:
+                yield tuple(cleaned[name] for name in field_names)
+
+
+IngredientFormSet = forms.formset_factory(
+    MixtureIngredientForm, formset=CustomFormSet, min_num=2,
+    validate_min=True
     )
