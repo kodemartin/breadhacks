@@ -1,6 +1,6 @@
 import farmhash
 
-from django.db import models, transaction
+from django.db import models, transaction, IntegrityError
 from custom_fields import UnsignedIntegerField
 from custom_models import Hash32Model, update_properties_and_save
 
@@ -227,22 +227,20 @@ class Mixture(Hash32Model):
         mixture ingredients.
 
         :param str title:
-        :param ingredient_quantity: A map between `Ingredient` instances
-            and quantities for this mixture.
-        :type ingredient_quantity: dict or None
+        :param ingredient_quantity: A sequence of ``(Ingredient, <quantity>)``
+            pairs.
+        :type ingredient_quantity: iterable or None
         :param str unit: The unit of the quantities specified.
         :param mixtures: Sequence of nested 'Mixture' instances.
         :type mixtures: iterable or None
         :rtype: Mixture
+        :raises IntegrityError: If a duplicate mixture exists in the
+            database.
         """
-        mixture = cls.get_duplicate(ingredient_quantity)
-        if mixture:
-            return mixture
-
         mixture = cls(title=title, unit=unit)
         mixture.save()
         if ingredient_quantity:
-            for ingredient, quantity in ingredient_quantity.items():
+            for ingredient, quantity in ingredient_quantity:
                 mixture.add(ingredient, quantity)
         if mixtures:
             mixture.add_mixtures(mixtures)
@@ -396,7 +394,7 @@ class Recipe(Hash32Model):
                             mixtures=None, *, atomic=True):
         """Instantiate the overall formula of the recipe.
 
-        :param dict ingredient_quantity:
+        :param iterable ingredient_quantity:
         :param str unit:
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
@@ -412,7 +410,7 @@ class Recipe(Hash32Model):
         be deducted from the overall formula.
 
         :param str title: Title of the mixture.
-        :param dict ingredient_quantity:
+        :param iterable ingredient_quantity:
         :param str unit:
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
