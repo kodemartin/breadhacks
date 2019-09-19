@@ -428,6 +428,50 @@ class Recipe(Hash32Model):
         self.final.update_properties()
         self.final.save()
 
+    @classmethod
+    @transaction.atomic
+    def new(cls, title, overall, unit='[gr]', deductible=None, nested=None):
+        """Create a new `Recipe` instance and save the respective record
+        to the database, if no duplicate is found.
+
+        :param str title: The title of the recipe.
+        :param iterable overall: A sequence of ``(Ingredient, <quantity>)``
+            2-tuples that represent the overall mixture.
+        :param str unit: The unit of measurement for the quantities.
+        :param deductible: A sequence of
+            ``(<title>, [(Ingredient, <quantity>),...])`` 2-tuples
+            representing the deductible mixtures of the recipe.
+        :type deductible: iterable or None
+        :param nested: A dictionary map::
+
+                {'overall': [<nested_mixture>,...],
+                 'deductible': [[<nested_mixture>,...],...]}
+
+            to infer on any nested mixtures with respect
+            to the overall formula, and the deductible
+            mixtures of the recipe.
+
+            The cardinality of the nested mixtures in ``nested['deductible']``
+            should be of course consistent with the cardinality in
+            ``deductible``.
+        :rtype: Recipe
+        :raises IntegrityError: In case of a duplicate recipe
+        """
+        recipe = cls(title)
+        recipe.save()
+        recipe.add_overall_formula(ingredient_quantity=overall, unit=unit,
+                                   mixtures=nested['overall'], atomic=False)
+        i = 0
+        for title, ingredients in deductible:
+            recipe.add_deductible_mixture(
+                title=title, ingredient_quantity=ingredients, unit=unit,
+                mixtures=nested['deductible'][i], atomic=False
+                )
+            i += 1
+        recipe.update_properties()
+        recipe.save()
+        return recipe
+
 
 class Implementation(models.Model):
 
