@@ -1,9 +1,16 @@
 from django.http import HttpResponse, Http404, JsonResponse
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
+from django.views import defaults, View
 
-from .forms import MixtureForm, IngredientFormset
-from .models import Ingredient, Mixture
+from .forms import NestedMixtureForm, MixtureForm, IngredientFormSet
+from .models import Ingredient, Mixture, Recipe
+
+
+__all__ = ['list_ingredients', 'add_new_mixture', 'RecipeFormView',
+           'mixture_preview']
+
 
 # Create your views here.
 def list_ingredients(request):
@@ -23,10 +30,10 @@ def list_ingredients(request):
     return render(request, 'ingredients/list.html', context)
 
 
-def new_mixture(request):
+def add_new_mixture(request):
     if request.method == 'POST':
         form = MixtureForm(request.POST)
-        formset = IngredientFormset(request.POST)
+        formset = IngredientFormSet(request.POST)
         if all([form.is_valid(), formset.is_valid()]):
             ingredient_quantity = {}
             for f in formset:
@@ -41,36 +48,115 @@ def new_mixture(request):
                 f'Congrats. You entered a valid mixture [{mixture.hash32}].'
                 )
     else:
-        form = MixtureForm()
-        formset = IngredientFormset()
+        prefix = request.GET.get('prefix')
+        form = MixtureForm(prefix=prefix)
+        formset = IngredientFormSet(prefix=prefix)
 
     return render(request, 'mixtures/new.html', {
         'formset': formset, 'form': form, 'header': 'Add new mixture'
         })
 
 
-def new_recipe(request):
-    if request.method == 'POST':
-        recipe = MixtureForm(request.POST, prefix='recipe')
-        overall = IngredientFormset(request.POST, prefix='overall')
-        if (all([f.is_valid() for f in (recipe, overall)])):
-            return JsonResponse({
-                'recipe': {field.name: field.data for field in recipe},
-                'overall': [{field.name: field.data for field in f} for f in overall]
-                })
-        else:
-            return HttpResponse(
-                f'Problem...'
-                )
-    else:
+class RecipeFormView(View):
+    template_name = 'new.html'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.title = None
+        self.units = None
+        self.ingredients = None
+        self.nested = None
+
+    def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
-        overall_formula = IngredientFormset(prefix='overall')
+        overall_formula = IngredientFormSet(prefix='overall')
+        return render(request, self.template_name, {
+            'recipe': recipe_form, 'overall': overall_formula,
+            'header': 'Add new recipe'
+            })
 
-    return render(request, 'new.html', {
-        'recipe': recipe_form, 'overall': overall_formula,
-        'header': 'Add new recipe'
-        })
+    def post(self, request, *args, **kwargs):
+        self.validate_overall_data(request)
 
+        self.validate_nested_mixtures(request)
+        recipe = self.save_recipe()
+        return HttpResponse(
+            f'Awesome! Recipe [{recipe.hash32}] saved successfully'
+            )
+
+    def validate_overall_data(self, request):
+        """Validate the title, unit of the recipe,
+        and the ingredients of the overall formula.
+
+        The method stores these data in respective
+        attributes of the class. More specifically::
+
+            * self.title: Is the title string.
+            * self.units: The set of units.
+            * self.ingredients: A list of tuples (Ingredient, <quantity>)
+              representing the overall formula.
+
+        :param HttpRequest request:
+        :return: None or HttpResponseBadRequest
+        """
+        recipe_form = MixtureForm(request.POST, prefix='recipe')
+        overall_formula = IngredientFormSet(request.POST, prefix='overall')
+        for form in (recipe_form, overall_formula):
+            if not form.is_valid():
+                # TODO: More user-friendly handling
+                return JsonResponse({'error': 'Invalid recipe',
+                                     'message': form.errors.as_json()})
+        self.title = recipe_form.cleaned_data['title']
+        self.units = recipe_form.cleaned_data['unit']
+        self.ingredients = list(overall_formula.generate_cleaned_data())
+
+    def validate_nested_mixtures(self, request):
+        """Retrieve all data from any nested mixture
+        forms, validate them, and store them in a
+        convenient form in `self.nested`.
+
+        If successfull, `self.nested` is a list of
+        ``(<title>, <ingredient-quantity>)`` 2-tuples,
+        where ``<ingredient-quantity>`` is a sequence
+        of ``(Ingredient, <quantity>)`` pairs.
+
+        :param HttpRequest request:
+        """
+        i = 0
+        nested = []
+        while True:
+            prefix = f'nested_{i}'
+            meta = NestedMixtureForm(request.POST, prefix=prefix)
+            if not meta.is_valid():
+                break
+            ingredients = IngredientFormSet(request.POST, prefix=prefix)
+            if not ingredients.is_valid():
+                # TODO: More user-friendly handling
+                return JsonResponse({'error': 'Invalid nested mixture',
+                                     'message': ingredients.errors.as_json()})
+
+            i += 1
+            title = meta.cleaned_data['title']
+            ingredient_quantity = list(ingredients.generate_cleaned_data())
+            nested.append((title, ingredient_quantity))
+        self.nested = nested
+
+    @transaction.atomic
+    def save_recipe(self):
+        """Create new `Recipe` instance and save to the
+        database.
+
+        :return: Recipe
+        """
+        if self.title and self.ingredients:
+            recipe = Recipe(title=self.title)
+            recipe.save()
+            recipe.add_overall_formula(unit=self.units,
+                                       ingredient_quantity=dict(self.ingredients))
+            for title, ingredients in self.nested:
+                recipe.add_deductible_mixture(title=title, unit=self.units,
+                                              ingredient_quantity=dict(ingredients))
+            return recipe
 
 def mixture_preview(request):
     # TODO: Hanlde POST requests
