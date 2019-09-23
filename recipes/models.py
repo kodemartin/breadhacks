@@ -79,6 +79,7 @@ class Mixture(Hash32Model):
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
     unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
+    dependent = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'mixture'
@@ -242,7 +243,7 @@ class Mixture(Hash32Model):
     @classmethod
     @transaction.atomic
     def new(cls, title='Overall', ingredient_quantity=None, unit='[gr]',
-            mixtures=None):
+            dependent=False, mixtures=None):
         """Create a new mixture entry by specifying
         mixture ingredients.
 
@@ -257,7 +258,7 @@ class Mixture(Hash32Model):
         :raises IntegrityError: If a duplicate mixture exists in the
             database.
         """
-        mixture = cls(title=title, unit=unit)
+        mixture = cls(title=title, unit=unit, dependent=dependent)
         mixture.save()
         if ingredient_quantity:
             for ingredient, quantity in ingredient_quantity:
@@ -403,8 +404,16 @@ class Recipe(Hash32Model):
     class Meta:
         db_table = 'recipe'
 
-    def evaluate_hash(self):
-        return self.evaluate_hash_static(*self.mixtures.all())
+    def evaluate_hash(self, *args, **kwargs):
+        args = args or (self.overall, self.deductible)
+        if not args:
+            self.populate_mixtures()
+            args = self.overall, self.deductible
+        return self.evaluate_hash_static(*args, **kwargs)
+
+    def populate_mixtures(self):
+        self.overall = self.mixtures.get(dependent=1)
+        self.deductible = [(m.title, m) for m in self.mixtures.filter(dependent=0)]
 
     @update_properties_and_save
     def add_overall_formula(self, ingredient_quantity, unit='[gr]',
@@ -419,14 +428,16 @@ class Recipe(Hash32Model):
         with transaction.atomic():
             try:
                 self.overall = Mixture.new(
-                    'Overall formula', ingredient_quantity, unit, mixtures
+                    'Overall formula', ingredient_quantity, unit, True, mixtures
                     )
             except IntegrityError:
                 # We allow here duplicate overall formula, for the case
                 # of different deductible mixtures included. The integrity
                 # check is delegated to `Recipe.new`.
                 hash32 = Mixture.evaluate_hash_static(
-                    ingredient_quantity, *(mixtures or [])
+                    Mixture.aggregate_ingredient_quantities(
+                        ingredient_quantity, *(mixtures or [])
+                        )
                     )
                 self.overall = Mixture.objects.get(hash32=hash32)
         self.mixtures.add(self.overall)
@@ -445,16 +456,18 @@ class Recipe(Hash32Model):
         """
         with transaction.atomic():
             try:
-                to_add = Mixture.new(title, ingredient_quantity, unit, mixtures)
+                to_add = Mixture.new(title, ingredient_quantity, unit, mixtures=mixtures)
             except IntegrityError:
                 # Mixture exists, but we allow recipes with identical mixture
                 # components. We delegate the integrity check to `Recipe.new`.
-                hash32 = Mixture.evaluate_hash_static(ingredient_quantity,
-                                                      *(mixtures or []))
+                hash32 = Mixture.evaluate_hash_static(
+                    Mixture.aggregate_ingredient_quantities(ingredient_quantity,
+                                                            *(mixtures or []))
+                    )
                 to_add = Mixture.objects.get(hash32=hash32)
 
         self.mixtures.add(to_add)
-        self.deductible.append(to_add)
+        self.deductible.append((title, to_add))
 
     def calculate_final(self):
         # TODO: Probably need to deep-copy here
@@ -544,6 +557,7 @@ class Recipe(Hash32Model):
                 Mixture.evaluate_hash_static(ingredients, *nested_deductible[i])
                 )
             i += 1
+        hashes.sort()
         return farmhash.hash32(''.join(map(str, hashes)))
 
 

@@ -1,5 +1,5 @@
 from django.http import HttpResponse, Http404, JsonResponse
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
 from django.views import defaults, View
@@ -79,7 +79,14 @@ class RecipeFormView(View):
         self.validate_overall_data(request)
 
         self.validate_nested_mixtures(request)
-        recipe = self.save_recipe()
+
+        try:
+            recipe = self.save_recipe()
+        except IntegrityError:
+            hash32 = Recipe.evaluate_hash_static(self.ingredients, self.nested)
+            recipe = Recipe.objects.get(hash32=hash32)
+            return HttpResponse(f'Found duplicate [{recipe.hash32}]')
+
         return HttpResponse(
             f'Awesome! Recipe [{recipe.hash32}] saved successfully'
             )
@@ -149,14 +156,9 @@ class RecipeFormView(View):
         :return: Recipe
         """
         if self.title and self.ingredients:
-            recipe = Recipe(title=self.title)
-            recipe.save()
-            recipe.add_overall_formula(unit=self.units,
-                                       ingredient_quantity=dict(self.ingredients))
-            for title, ingredients in self.nested:
-                recipe.add_deductible_mixture(title=title, unit=self.units,
-                                              ingredient_quantity=dict(ingredients))
-            return recipe
+            return Recipe.new(self.title, self.ingredients,
+                              self.units, self.nested)
+
 
 def mixture_preview(request):
     # TODO: Hanlde POST requests
