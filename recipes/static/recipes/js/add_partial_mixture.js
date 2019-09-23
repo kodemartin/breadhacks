@@ -1,4 +1,4 @@
-function addNestedMixture(btn) {
+function addPartialMixture(btn) {
     /**
      * Issud an AJAX request to /recipes/mixture/new
      * to fetch the html of the respective form, and
@@ -7,12 +7,12 @@ function addNestedMixture(btn) {
      * @param Element btn The button that triggers the action
      * @returns Boolean
      */
-    const nestedCount = $('.nested-mixture-template').length;
-    $.get('/recipes/mixture/new', {'prefix': 'nested_' + nestedCount},
+    const partialCount = $('.partial-mixture-template').length;
+    $.get('/recipes/mixture/new', {'prefix': 'partial_' + partialCount},
           function (response) {
-              let form = $(response).find('.nested-mixture-template');
+              let form = $(response).find('.partial-mixture-template');
               btn.parents('.row').before(form);
-              form.find('input').first().attr("placeholder", "Nested mixture title");
+              form.find('input').first().attr("placeholder", "Partial mixture title");
               form.find('[id*=unit]').parent().remove();
               form.after('<hr>');
           });
@@ -20,7 +20,7 @@ function addNestedMixture(btn) {
 
 $(document).on('click', '#add-mixture', function(e){
     e.preventDefault();
-    addNestedMixture($(this));
+    addPartialMixture($(this));
     return false;
 });
 
