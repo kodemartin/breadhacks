@@ -405,7 +405,7 @@ class Recipe(Hash32Model):
         db_table = 'recipe'
 
     def evaluate_hash(self, *args, **kwargs):
-        args = args or (self.overall, self.deductible)
+        args = args or list(filter(None, (self.overall, self.deductible)))
         if not args:
             self.populate_mixtures()
             args = self.overall, self.deductible
@@ -413,7 +413,7 @@ class Recipe(Hash32Model):
 
     def populate_mixtures(self):
         self.overall = self.mixtures.get(dependent=1)
-        self.deductible = [(m.title, m) for m in self.mixtures.filter(dependent=0)]
+        self.deductible = self.mixtures.filter(dependent=0)
 
     @update_properties_and_save
     def add_overall_formula(self, ingredient_quantity, unit='[gr]',
@@ -467,7 +467,7 @@ class Recipe(Hash32Model):
                 to_add = Mixture.objects.get(hash32=hash32)
 
         self.mixtures.add(to_add)
-        self.deductible.append((title, to_add))
+        self.deductible.append(to_add)
 
     def calculate_final(self):
         # TODO: Probably need to deep-copy here
@@ -536,8 +536,8 @@ class Recipe(Hash32Model):
 
         :param iterable overall: A sequence of ``(Ingredient, <quantity>)``
             2-tuples that represent the overall mixture.
-        :param deductible: A sequence of
-            ``(<title>, [(Ingredient, <quantity>),...])`` 2-tuples
+        :param deductible: A sequence of deductible mixtures
+            ``[[(Ingredient, <quantity>),...]]``
             representing the deductible mixtures of the recipe.
         :type deductible: iterable or None
         :param nested: A dictionary map following the signature of
@@ -551,7 +551,7 @@ class Recipe(Hash32Model):
 
         nested_deductible = nested.get('deductible', [])
         i = 0
-        for _, ingredients in deductible:
+        for ingredients in deductible:
             nested_deductible.append([])
             hashes.append(
                 Mixture.evaluate_hash_static(ingredients, *nested_deductible[i])

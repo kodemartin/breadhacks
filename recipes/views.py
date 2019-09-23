@@ -83,7 +83,8 @@ class RecipeFormView(View):
         try:
             recipe = self.save_recipe()
         except IntegrityError:
-            hash32 = Recipe.evaluate_hash_static(self.ingredients, self.nested)
+            hash32 = Recipe.evaluate_hash_static(self.ingredients,
+                                                 [m for _, m in self.nested])
             recipe = Recipe.objects.get(hash32=hash32)
             return HttpResponse(f'Found duplicate [{recipe.hash32}]')
 
