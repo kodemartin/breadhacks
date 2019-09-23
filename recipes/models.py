@@ -1,6 +1,7 @@
 import farmhash
 
-from django.db import models, transaction
+from collections import defaultdict
+from django.db import models, transaction, IntegrityError
 from custom_fields import UnsignedIntegerField
 from custom_models import Hash32Model, update_properties_and_save
 
@@ -78,6 +79,7 @@ class Mixture(Hash32Model):
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
     unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
+    dependent = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'mixture'
@@ -87,22 +89,8 @@ class Mixture(Hash32Model):
         self._ingredient_quantities = None
         self._ingredient_normquantities = None
 
-    @property
-    def ingredient_normquantities(self):
-        """List of tuples ``(ingredient-instance, normquantity)``.
-
-        :rtype: list
-        """
-        if self._ingredient_normquantities is None:
-            self.cache_normalized()
-        return self._ingredient_normquantities
-
-    def cache_normalized(self):
-        """Cache the normalized ingredient-quantity pairs."""
-        self.cache_ingredient_quantities()
-        self._ingredient_normquantities = self.normalize_ingredients(
-            dict(self.ingredient_quantities)
-            )
+    def __iter__(self):
+        return self.iter_ingredient_quantities()
 
     @property
     def ingredient_quantities(self):
@@ -118,10 +106,78 @@ class Mixture(Hash32Model):
     def ingredient_quantities(self, value):
         self._ingredient_quantities = value
 
+    @property
+    def ingredient_normquantities(self):
+        """List of tuples ``(ingredient-instance, normquantity)``.
+
+        :rtype: list
+        """
+        if self._ingredient_normquantities is None:
+            self.cache_normalized()
+        return self._ingredient_normquantities
+
+    def cache_normalized(self):
+        """Cache the normalized ingredient-quantity pairs."""
+        self.cache_ingredient_quantities()
+        self._ingredient_normquantities = list(
+            self.normalize(self.ingredient_quantities)
+            )
+
+    def cache_ingredient_quantities(self):
+        """Update cache of db-stored ingredient
+        quantities.
+        """
+        self._ingredient_quantities = self.aggregate_ingredient_quantities(self)
+
+    @staticmethod
+    def sort(ingredient_quantity):
+        """Wrap the sorting rule for the ingredient-quantity pairs.
+
+        :param iterable ingredient_quantity: The iterable with the
+            ingredient-quantity pairs.
+        :rtype: list
+        :return: The sorted sequence of the ingredient-quantity pairs.
+        """
+        key = lambda pair: pair[0].hash32
+        return sorted(ingredient_quantity, key=key)
+
+    @staticmethod
+    def aggregate_ingredient_quantities(*ingredient_quantities):
+        """Add together quantities of ingredients common
+        to various mixtures, represented by iterables
+        of ``(Ingredient, quantity)`` 2-tuples.
+
+        :param ingredient_quantities: Sequence of iterables
+            of ``(Ingredient, quantity)`` 2-tuples.
+        :rtype: list
+        :return: A sequence of the aggregated ``(Ingredient, quantity)``
+            2-tuples.
+        """
+        aggregate_quantities = defaultdict(int)
+        for ingredient_quantity in ingredient_quantities:
+            for ingredient, quantity in ingredient_quantity:
+                aggregate_quantities[ingredient] += quantity
+        return list(aggregate_quantities.items())
+
     def update_properties(self):
         """Update hash and properties of the instance."""
         super().update_properties()
         self.cache_normalized()
+
+    def evaluate_hash(self):
+        """Evaluate the hash of the mixture. If ``ingredient-quantities``
+        are given, evaluate the hash of that configuration.
+
+        The evaluation takes into account the ingredients
+        and their normalized quantity.
+
+        :param ingredient_quantities: A sequence of tuples
+            ``(Ingredient: <float: quantity>)``.
+        :rtype: int
+        """
+        self.cache_ingredient_quantities()
+
+        return self.evaluate_hash_static(self.ingredient_quantities)
 
     @classmethod
     def evaluate_hash_static(cls, ingredient_quantities):
@@ -129,32 +185,19 @@ class Mixture(Hash32Model):
         a map between ``Ingredient`` instances and respective
         quantities.
 
-        :param dict ingredient_quantities:
+        Account also for any nested mixtures given.
+
+        :param list ingredient_quantities: A list of tuples
+            ``(Ingrediend, quantity)``.
+        :param nested_mixtures: A sequence of mixture instances or
+            ``(Ingredient, quantity)`` tuples.
         :rtype: int
         """
-        quantities = cls.normalize_ingredients(ingredient_quantities)
+        quantities = cls.normalize(cls.sort(ingredient_quantities))
         hsource = ''
         for i, norm_quantity in quantities:
             hsource += str(i.hash32) + str(norm_quantity)
         return farmhash.hash32(hsource)
-
-    def evaluate_hash(self, ingredient_quantities=None):
-        """Evaluate the hash of the mixture. If ``ingredient-quantities``
-        are given, evaluate the hash of that configuration.
-
-        The evaluation takes into account the ingredients
-        and their normalized quantity.
-
-        :param ingredient_quantities: A ``{Ingredient: <float: quantity>}`` map.
-        :rtype: int
-        """
-        if ingredient_quantities is None:
-            self.cache_normalized()
-            quantities = self.ingredient_normquantities
-        else:
-            quantities = self.normalize_ingredients(ingredient_quantities)
-
-        return self.evaluate_hash_static(dict(quantities))
 
     def iter_mixture_ingredients(self):
         through = self.ingredient.through.objects
@@ -174,30 +217,8 @@ class Mixture(Hash32Model):
         for mi in self.iter_mixture_ingredients():
             yield (mi.ingredient, mi.quantity)
 
-    def aggregate_ingredient_quantities(self):
-        """Add together quantities of ingredients common
-        to nested mixtures.
-
-        :rtype: dict
-        """
-        aggregate_quantities = {}
-        for ingredient, quantity in self.iter_ingredient_quantities():
-            if ingredient in aggregate_quantities:
-                aggregate_quantities[ingredient] += quantity
-            else:
-                aggregate_quantities[ingredient] = quantity
-        return aggregate_quantities
-
-    def cache_ingredient_quantities(self):
-        """Update cache of db-stored ingredient
-        quantities.
-        """
-        self._ingredient_quantities = list(
-            self.aggregate_ingredient_quantities().items()
-            )
-
     @staticmethod
-    def normalize_ingredients(quantities, reference='flour'):
+    def normalize(ingredient_quantity, reference='flour'):
         """Normalize ingredient quantities w.r.t the
         total quantity of the ingredients of the
         specified ``reference`` type. If no such ingredient
@@ -208,41 +229,39 @@ class Mixture(Hash32Model):
         This conveniently yields the baker's ratio
         if we normalize w.r.t. flour-ingredients.
 
-        :param dict quantities: A map ``{<Ingredient>: quantity}``.
+        :param list ingredient_quantity: A list of tuples ``(<Ingredient>: quantity)``.
         :type quantities: dict or None
         :param str reference:
         :return: An iterator of tuples ``(ingredient_instance, normalized_value)``.
         """
-        total = sum((quantity for (i, quantity) in quantities.items() if
-                    i.type==reference))
-        total = total or max(quantities.values())
-        for i, quantity in quantities.items():
+        total = sum((quantity for (i, quantity) in ingredient_quantity if
+                     i.type == reference))
+        total = total or max([quantity for _, quantity in ingredient_quantity])
+        for i, quantity in ingredient_quantity:
             yield i, quantity/total
 
     @classmethod
     @transaction.atomic
     def new(cls, title='Overall', ingredient_quantity=None, unit='[gr]',
-            mixtures=None):
+            dependent=False, mixtures=None):
         """Create a new mixture entry by specifying
         mixture ingredients.
 
         :param str title:
-        :param ingredient_quantity: A map between `Ingredient` instances
-            and quantities for this mixture.
-        :type ingredient_quantity: dict or None
+        :param ingredient_quantity: A sequence of ``(Ingredient, <quantity>)``
+            pairs.
+        :type ingredient_quantity: iterable or None
         :param str unit: The unit of the quantities specified.
         :param mixtures: Sequence of nested 'Mixture' instances.
         :type mixtures: iterable or None
         :rtype: Mixture
+        :raises IntegrityError: If a duplicate mixture exists in the
+            database.
         """
-        mixture = cls.get_duplicate(ingredient_quantity)
-        if mixture:
-            return mixture
-
-        mixture = cls(title=title, unit=unit)
+        mixture = cls(title=title, unit=unit, dependent=dependent)
         mixture.save()
         if ingredient_quantity:
-            for ingredient, quantity in ingredient_quantity.items():
+            for ingredient, quantity in ingredient_quantity:
                 mixture.add(ingredient, quantity)
         if mixtures:
             mixture.add_mixtures(mixtures)
@@ -291,7 +310,6 @@ class Mixture(Hash32Model):
         Q = models.Q
         return cls.objects.get(Q(id=key) | Q(hash32=key))
 
-
     @update_properties_and_save
     def add_mixtures(self, mixtures, *, atomic=False):
         """Add multiple nested mixtures.
@@ -309,8 +327,8 @@ class Mixture(Hash32Model):
         """Given a map between ingredients and quantities
         check if the database contains a duplicate.
 
-        :param dict ingredient_quantity: A map between ``Ingredient``
-            instances and quantities for this mixture.
+        :param list ingredient_quantity: A list of `Ingredient``
+            instances and quantity pairs for this mixture.
         :rtype: Mixture or None
         """
         return cls.objects.filter(
@@ -386,23 +404,42 @@ class Recipe(Hash32Model):
     class Meta:
         db_table = 'recipe'
 
-    def evaluate_hash(self):
-        if self.overall:
-            h = self.overall.hash32
-            return h
+    def evaluate_hash(self, *args, **kwargs):
+        args = args or list(filter(None, (self.overall, self.deductible)))
+        if not args:
+            self.populate_mixtures()
+            args = self.overall, self.deductible
+        return self.evaluate_hash_static(*args, **kwargs)
+
+    def populate_mixtures(self):
+        self.overall = self.mixtures.get(dependent=1)
+        self.deductible = self.mixtures.filter(dependent=0)
 
     @update_properties_and_save
     def add_overall_formula(self, ingredient_quantity, unit='[gr]',
                             mixtures=None, *, atomic=True):
         """Instantiate the overall formula of the recipe.
 
-        :param dict ingredient_quantity:
+        :param iterable ingredient_quantity:
         :param str unit:
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
         """
-        self.overall = Mixture.new('Overall formula', ingredient_quantity, unit,
-                                   mixtures)
+        with transaction.atomic():
+            try:
+                self.overall = Mixture.new(
+                    'Overall formula', ingredient_quantity, unit, True, mixtures
+                    )
+            except IntegrityError:
+                # We allow here duplicate overall formula, for the case
+                # of different deductible mixtures included. The integrity
+                # check is delegated to `Recipe.new`.
+                hash32 = Mixture.evaluate_hash_static(
+                    Mixture.aggregate_ingredient_quantities(
+                        ingredient_quantity, *(mixtures or [])
+                        )
+                    )
+                self.overall = Mixture.objects.get(hash32=hash32)
         self.mixtures.add(self.overall)
 
     @update_properties_and_save
@@ -412,12 +449,23 @@ class Recipe(Hash32Model):
         be deducted from the overall formula.
 
         :param str title: Title of the mixture.
-        :param dict ingredient_quantity:
+        :param iterable ingredient_quantity:
         :param str unit:
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
         """
-        to_add = Mixture.new(title, ingredient_quantity, unit)
+        with transaction.atomic():
+            try:
+                to_add = Mixture.new(title, ingredient_quantity, unit, mixtures=mixtures)
+            except IntegrityError:
+                # Mixture exists, but we allow recipes with identical mixture
+                # components. We delegate the integrity check to `Recipe.new`.
+                hash32 = Mixture.evaluate_hash_static(
+                    Mixture.aggregate_ingredient_quantities(ingredient_quantity,
+                                                            *(mixtures or []))
+                    )
+                to_add = Mixture.objects.get(hash32=hash32)
+
         self.mixtures.add(to_add)
         self.deductible.append(to_add)
 
@@ -429,6 +477,88 @@ class Recipe(Hash32Model):
         self.final.title = 'Final'
         self.final.update_properties()
         self.final.save()
+
+    @classmethod
+    @transaction.atomic
+    def new(cls, title, overall, unit='[gr]', deductible=None, nested=None, *,
+            atomic=True):
+        """Create a new `Recipe` instance and save the respective record
+        to the database, if no duplicate is found.
+
+        :param str title: The title of the recipe.
+        :param iterable overall: A sequence of ``(Ingredient, <quantity>)``
+            2-tuples that represent the overall mixture.
+        :param str unit: The unit of measurement for the quantities.
+        :param deductible: A sequence of
+            ``(<title>, [(Ingredient, <quantity>),...])`` 2-tuples
+            representing the deductible mixtures of the recipe.
+        :type deductible: iterable or None
+        :param nested: A dictionary map::
+
+                {'overall': [<nested_mixture>,...],
+                 'deductible': [[<nested_mixture>,...],...]}
+
+            to infer on any nested mixtures with respect
+            to the overall formula, and the deductible
+            mixtures of the recipe.
+
+            The cardinality of the nested mixtures in ``nested['deductible']``
+            should be of course consistent with the cardinality in
+            ``deductible``.
+        :rtype: Recipe
+        :raises IntegrityError: In case of a duplicate recipe
+        """
+        recipe = cls(title=title)
+        recipe.save()
+
+        nested = nested or {}
+        recipe.add_overall_formula(ingredient_quantity=overall, unit=unit,
+                                   mixtures=nested.get('overall'), atomic=False)
+        i = 0
+        nested_deductible = nested.get('deductible', [])
+        for _title, ingredients in deductible:
+            nested_deductible.append(None) # Satisfy existence
+                                           # of the index in the function call
+                                           # below
+            recipe.add_deductible_mixture(
+                title=_title, ingredient_quantity=ingredients, unit=unit,
+                mixtures=nested_deductible[i], atomic=False
+                )
+            i += 1
+        recipe.update_properties()
+        recipe.save()
+        return recipe
+
+    @staticmethod
+    def evaluate_hash_static(overall, deductible, nested=None):
+        """Evaluate the hash of a recipe given the information
+        on the included mixtures.
+
+        :param iterable overall: A sequence of ``(Ingredient, <quantity>)``
+            2-tuples that represent the overall mixture.
+        :param deductible: A sequence of deductible mixtures
+            ``[[(Ingredient, <quantity>),...]]``
+            representing the deductible mixtures of the recipe.
+        :type deductible: iterable or None
+        :param nested: A dictionary map following the signature of
+            `Recipe.new`.
+        :rtype: int
+        """
+        nested = nested or {}
+        hashes = [
+            Mixture.evaluate_hash_static(overall, *nested.get('overall', []))
+            ]
+
+        nested_deductible = nested.get('deductible', [])
+        i = 0
+        for ingredients in deductible:
+            nested_deductible.append([])
+            hashes.append(
+                Mixture.evaluate_hash_static(ingredients, *nested_deductible[i])
+                )
+            i += 1
+        hashes.sort()
+        return farmhash.hash32(''.join(map(str, hashes)))
 
 
 class Implementation(models.Model):

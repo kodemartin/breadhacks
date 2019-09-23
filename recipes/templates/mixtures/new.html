@@ -6,7 +6,7 @@
 <div class='container'>
 <form action="/recipes/mixture/new/" method="post">
     {% csrf_token %}
-    <div class='nested-mixture-template'>
+    <div class='partial-mixture-template'>
         <div class='form-row'>
             <div class='col-3'>
                 {{form.title.errors}}

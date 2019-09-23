@@ -1,5 +1,5 @@
 from django.http import HttpResponse, Http404, JsonResponse
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
 from django.views import defaults, View
@@ -65,7 +65,7 @@ class RecipeFormView(View):
         self.title = None
         self.units = None
         self.ingredients = None
-        self.nested = None
+        self.partial = None
 
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
@@ -78,8 +78,16 @@ class RecipeFormView(View):
     def post(self, request, *args, **kwargs):
         self.validate_overall_data(request)
 
-        self.validate_nested_mixtures(request)
-        recipe = self.save_recipe()
+        self.validate_partial_mixtures(request)
+
+        try:
+            recipe = self.save_recipe()
+        except IntegrityError:
+            hash32 = Recipe.evaluate_hash_static(self.ingredients,
+                                                 [m for _, m in self.partial])
+            recipe = Recipe.objects.get(hash32=hash32)
+            return HttpResponse(f'Found duplicate [{recipe.hash32}]')
+
         return HttpResponse(
             f'Awesome! Recipe [{recipe.hash32}] saved successfully'
             )
@@ -110,12 +118,12 @@ class RecipeFormView(View):
         self.units = recipe_form.cleaned_data['unit']
         self.ingredients = list(overall_formula.generate_cleaned_data())
 
-    def validate_nested_mixtures(self, request):
-        """Retrieve all data from any nested mixture
+    def validate_partial_mixtures(self, request):
+        """Retrieve all data from any partial mixture
         forms, validate them, and store them in a
-        convenient form in `self.nested`.
+        convenient form in `self.partial`.
 
-        If successfull, `self.nested` is a list of
+        If successfull, `self.partial` is a list of
         ``(<title>, <ingredient-quantity>)`` 2-tuples,
         where ``<ingredient-quantity>`` is a sequence
         of ``(Ingredient, <quantity>)`` pairs.
@@ -123,23 +131,23 @@ class RecipeFormView(View):
         :param HttpRequest request:
         """
         i = 0
-        nested = []
+        partial = []
         while True:
-            prefix = f'nested_{i}'
+            prefix = f'partial_{i}'
             meta = NestedMixtureForm(request.POST, prefix=prefix)
             if not meta.is_valid():
                 break
             ingredients = IngredientFormSet(request.POST, prefix=prefix)
             if not ingredients.is_valid():
                 # TODO: More user-friendly handling
-                return JsonResponse({'error': 'Invalid nested mixture',
+                return JsonResponse({'error': 'Invalid partial mixture',
                                      'message': ingredients.errors.as_json()})
 
             i += 1
             title = meta.cleaned_data['title']
             ingredient_quantity = list(ingredients.generate_cleaned_data())
-            nested.append((title, ingredient_quantity))
-        self.nested = nested
+            partial.append((title, ingredient_quantity))
+        self.partial = partial
 
     @transaction.atomic
     def save_recipe(self):
@@ -149,14 +157,9 @@ class RecipeFormView(View):
         :return: Recipe
         """
         if self.title and self.ingredients:
-            recipe = Recipe(title=self.title)
-            recipe.save()
-            recipe.add_overall_formula(unit=self.units,
-                                       ingredient_quantity=dict(self.ingredients))
-            for title, ingredients in self.nested:
-                recipe.add_deductible_mixture(title=title, unit=self.units,
-                                              ingredient_quantity=dict(ingredients))
-            return recipe
+            return Recipe.new(self.title, self.ingredients,
+                              self.units, self.partial)
+
 
 def mixture_preview(request):
     # TODO: Hanlde POST requests
