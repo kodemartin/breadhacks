@@ -23,7 +23,7 @@ class MixtureForm(forms.ModelForm):
 
 class MixtureIngredientForm(forms.ModelForm):
 
-    ingredient = forms.ModelChoiceField(Ingredient.objects,
+    ingredient = forms.ModelChoiceField(Ingredient.objects.all(),
                                         empty_label='Choose ingredient...')
     quantity = forms.IntegerField(min_value=1, initial=100)
 
