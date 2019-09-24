@@ -166,3 +166,9 @@ def mixture_preview(request):
     key = request.GET['key']
     mixture = get_object_or_404(Mixture, Q(id=key) | Q(hash32=key))
     return HttpResponse(f'Mixture [{mixture.id}-{mixture.hash32}]')
+
+def list_partial_mixtures(request):
+    term = request.GET.get('q', '')
+    results = [m.title for m in Mixture.objects.filter(title__startswith=term)]
+    results = ['nested-1', 'nested-2', 'nested-3']
+    return JsonResponse(results, safe=False)
