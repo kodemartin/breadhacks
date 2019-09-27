@@ -37,7 +37,6 @@ $('#loadable-mixture').change(function (){
         to_remove.remove();
         // Update management form
         let total = form.find('input').filter('[id*=TOTAL_FORMS]');
-        console.log(total);
         total.val(total.val() - decr);
         select.val("");
     });
