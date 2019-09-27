@@ -1,15 +1,22 @@
+import logging
+import json
+
 from django.http import HttpResponse, Http404, JsonResponse
 from django.db import transaction, IntegrityError
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
 from django.views import defaults, View
 
-from .forms import NestedMixtureForm, MixtureForm, IngredientFormSet
+from .forms import (NestedMixtureForm, MixtureForm, IngredientFormSet,
+                    LoadableMixtureForm)
 from .models import Ingredient, Mixture, Recipe
 
 
 __all__ = ['list_ingredients', 'add_new_mixture', 'RecipeFormView',
            'mixture_preview']
+
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 # Create your views here.
@@ -57,34 +64,64 @@ def add_new_mixture(request):
         })
 
 
+def load_mixture(request):
+    if request.method == 'GET':
+        raise Http404("Only POST method supported.")
+    elif request.method == 'POST':
+        prefix = request.POST.get('prefix')
+        initial = json.loads(request.POST['initial'])
+        mixture_header = {key: initial[key] for key in ('title', 'unit')}
+        ingredients = initial['ingredients']
+
+    form = MixtureForm(prefix=prefix, initial=mixture_header)
+    formset = IngredientFormSet(prefix=prefix, initial=ingredients)
+    return render(request, 'mixtures/load.html', {
+        'formset': formset, 'form': form
+        })
+
+
+
 class RecipeFormView(View):
     template_name = 'new.html'
+
+    logger = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title = None
-        self.units = None
+        self.unit = None
         self.ingredients = None
-        self.partial = None
+        self.partial = []
+        self.loaded = []
+        self.logger = self.logger or logging.getLogger(self.__class__.__name__)
 
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
         overall_formula = IngredientFormSet(prefix='overall')
+        loadable_mixture = LoadableMixtureForm(Mixture.objects
+                                                      .filter(dependent=0))
         return render(request, self.template_name, {
             'recipe': recipe_form, 'overall': overall_formula,
-            'header': 'Add new recipe'
+            'header': 'Add new recipe',
+            'loadable_mixture': loadable_mixture
             })
 
     def post(self, request, *args, **kwargs):
+        self.logger.debug(f"==> Posted {request.POST}")
         self.validate_overall_data(request)
+        self.logger.debug("==> Validated overall_data")
 
-        self.validate_partial_mixtures(request)
+        response = (self.process_partial_mixtures(request) or
+                    self.process_loaded_mixtures(request))
+        if response is not None:
+            return response
 
         try:
             recipe = self.save_recipe()
         except IntegrityError:
             hash32 = Recipe.evaluate_hash_static(self.ingredients,
-                                                 [m for _, m in self.partial])
+                                                 [m for _, m in self.partial]+
+                                                 self.loaded)
             recipe = Recipe.objects.get(hash32=hash32)
             return HttpResponse(f'Found duplicate [{recipe.hash32}]')
 
@@ -100,7 +137,7 @@ class RecipeFormView(View):
         attributes of the class. More specifically::
 
             * self.title: Is the title string.
-            * self.units: The set of units.
+            * self.unit: The set of units.
             * self.ingredients: A list of tuples (Ingredient, <quantity>)
               representing the overall formula.
 
@@ -113,52 +150,147 @@ class RecipeFormView(View):
             if not form.is_valid():
                 # TODO: More user-friendly handling
                 return JsonResponse({'error': 'Invalid recipe',
-                                     'message': form.errors.as_json()})
+                                     'message': form.errors})
         self.title = recipe_form.cleaned_data['title']
-        self.units = recipe_form.cleaned_data['unit']
+        self.unit = recipe_form.cleaned_data['unit']
         self.ingredients = list(overall_formula.generate_cleaned_data())
 
-    def validate_partial_mixtures(self, request):
+    def extract_mixtures(self, request, prefix):
+        """Traverse the transmitted forms in the request, to
+        retrieve information about forms with the specified
+        prefix.
+
+        The method iterates over the header info represented by
+        a `NestedMixtureForm` instance and the ingredient-quantity
+        pairs represented by a `IngredientFormset` instance.
+
+        :param HttpRequest request:
+        :param str prefix: The prefix of the forms to be extracted.
+        :return: A generator of ``(NestedMixtureForm, IngredientFormSet)``
+            2-tuples.
+        """
+        i = 0
+        while True:
+            current_prefix = f'{prefix}_{i}'
+            meta = NestedMixtureForm(request.POST, prefix=current_prefix)
+            if not meta.is_valid():
+                break
+            ingredients = IngredientFormSet(request.POST, prefix=current_prefix)
+            yield meta, ingredients
+            i += 1
+
+    @staticmethod
+    def validate_mixture(header, ingredients):
+        """Check that the partial mixture represented
+        by the specified ingredients is valid.
+
+        :param NestedMixtureForm header:
+        :param IngredientFormSet ingredients:
+        :rtype: None or JsonResponse
+        """
+        if not ingredients.is_valid():
+            # TODO: More user-friendly handling
+            return JsonResponse({'error': 'Invalid partial mixture',
+                                 'message': ingredients.errors})
+
+    def classify_loaded_mixture(self, header, ingredients):
+        """Check if the loaded mixture has been changed. On this event,
+        check if the mixture is a duplicate and if not classify
+        along with any new mixtures in `self.partial`. Otherwise,
+        the mixture is classified in `self.loaded`.
+
+        New mixtures with changed titles are not accepted
+        so that to avoid storing different partial mixtures by
+        the same name.
+
+        :param NestedMixtureForm header:
+        :param IngredientFormSet ingredients:
+        :rtype: None
+        :raises Http404: If the mixture is a duplicate
+            and has a modified title.
+        """
+        title, ingredient_quantity = self.analyze_mixture(header, ingredients)
+        duplicate = Mixture.get_duplicate(ingredient_quantity)
+        if duplicate is None:
+            if header.has_changed():
+                raise Http404((f'Please provide a different title '
+                               f'for edit mixture "{title}"'))
+            return self.partial.append((title, ingredient_quantity))
+        return self.loaded.append(duplicate)
+
+    @staticmethod
+    def analyze_mixture(header, ingredients):
+        """Analyze the mixture represented by the forms
+        passed as arguments to its title and ingredient-quantity
+        pairs.
+
+        :param NestedMixtureForm header:
+        :param IngredientFormSet ingredients:
+        :rtype: tuple
+        :return: A ``(<title>, <ingredient-quantity>)``
+            2-tuples, where ``<ingredient-quantity>`` is a
+            sequence of ``(Ingredient, <quantity>)`` 2-tuples.
+        """
+        title = header.cleaned_data['title']
+        ingredient_quantity = list(ingredients.generate_cleaned_data())
+        return title, ingredient_quantity
+
+    def process_partial_mixtures(self, request, prefix='partial'):
         """Retrieve all data from any partial mixture
         forms, validate them, and store them in a
         convenient form in `self.partial`.
 
-        If successfull, `self.partial` is a list of
+        If successfull, `self.partial` is assigned a list of
         ``(<title>, <ingredient-quantity>)`` 2-tuples,
         where ``<ingredient-quantity>`` is a sequence
         of ``(Ingredient, <quantity>)`` pairs.
 
         :param HttpRequest request:
+        :param str prefix: The prefix that identifies partial forms.
         """
-        i = 0
-        partial = []
-        while True:
-            prefix = f'partial_{i}'
-            meta = NestedMixtureForm(request.POST, prefix=prefix)
-            if not meta.is_valid():
-                break
-            ingredients = IngredientFormSet(request.POST, prefix=prefix)
-            if not ingredients.is_valid():
-                # TODO: More user-friendly handling
-                return JsonResponse({'error': 'Invalid partial mixture',
-                                     'message': ingredients.errors.as_json()})
+        self.logger.debug("==> Processing partial mixtures..")
+        for header, ingredients in self.extract_mixtures(request, prefix):
+            response = self.validate_mixture(header, ingredients)
+            if response is not None:
+                return response
+            self.partial.append(self.analyze_mixture(header, ingredients))
 
-            i += 1
-            title = meta.cleaned_data['title']
-            ingredient_quantity = list(ingredients.generate_cleaned_data())
-            partial.append((title, ingredient_quantity))
-        self.partial = partial
+    def process_loaded_mixtures(self, request, prefix='loadable'):
+        """Retrieve all data from any loaded mixture
+        forms, validate them, and store them in a
+        convenient form in `self.loaded`.
+
+        Validation involves checking if the loaded mixture
+        has been changed. In that case, the quantities
+        have been edited and the mixture might be a new
+        mixture.
+
+        If successfull, `self.loaded` is assigned a list of
+        ``(<title>, <ingredient-quantity>)`` 2-tuples,
+        where ``<ingredient-quantity>`` is a sequence
+        of ``(Ingredient, <quantity>)`` pairs.
+
+        :param HttpRequest request:
+        :param str prefix: The prefix that identifies partial forms.
+        :rtype: None or `JsonResponse`
+        """
+        self.logger.debug("==> Processing loaded mixtures")
+        for header, ingredients in self.extract_mixtures(request, prefix):
+            response = self.validate_mixture(header, ingredients)
+            if response is not None:
+                return response
+            self.classify_loaded_mixture(header, ingredients)
 
     @transaction.atomic
     def save_recipe(self):
         """Create new `Recipe` instance and save to the
         database.
 
-        :return: Recipe
+        :return: Recipe or None
         """
         if self.title and self.ingredients:
-            return Recipe.new(self.title, self.ingredients,
-                              self.units, self.partial)
+            return Recipe.new(self.title, self.ingredients, self.unit,
+                              self.partial, loaded=self.loaded)
 
 
 def mixture_preview(request):
@@ -170,5 +302,15 @@ def mixture_preview(request):
 def list_partial_mixtures(request):
     term = request.GET.get('q', '')
     results = [m.title for m in Mixture.objects.filter(title__startswith=term)]
-    results = ['nested-1', 'nested-2', 'nested-3']
     return JsonResponse(results, safe=False)
+
+
+def list_mixture_ingredients(request):
+    m_id = request.GET['id']
+    mixture = Mixture.objects.get(id=m_id)
+    response = {
+        'title': mixture.title,
+        'unit': mixture.unit,
+        'ingredients': [{'ingredient': i.id, 'quantity': q} for i, q in mixture]
+        }
+    return JsonResponse(response)
