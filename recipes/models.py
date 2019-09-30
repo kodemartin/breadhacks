@@ -79,7 +79,6 @@ class Mixture(Hash32Model):
     #       Explore pre_save, post_save signals functionality to this end
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
     unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
-    dependent = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'mixture'
@@ -243,7 +242,7 @@ class Mixture(Hash32Model):
     @classmethod
     @transaction.atomic
     def new(cls, title='Overall', ingredient_quantity=None, unit='[gr]',
-            dependent=False, mixtures=None):
+            mixtures=None):
         """Create a new mixture entry by specifying
         mixture ingredients.
 
@@ -258,7 +257,7 @@ class Mixture(Hash32Model):
         :raises IntegrityError: If a duplicate mixture exists in the
             database.
         """
-        mixture = cls(title=title, unit=unit, dependent=dependent)
+        mixture = cls(title=title, unit=unit)
         mixture.save()
         if ingredient_quantity:
             for ingredient, quantity in ingredient_quantity:
@@ -340,30 +339,27 @@ class Mixture(Hash32Model):
             {f'{i}': q for i, q in self.ingredient_quantities}
             )
 
-    @transaction.atomic
     def __add__(self, other):
-        result = Mixture(title=self.title)
-        result.save()
-        iqself = dict(self.ingredient_quantities)
-        iqother = dict(other.ingredient_quantities)
-        for ingredient in set(iqself).union(iqother):
-            quantity = iqself.get(ingredient, 0.) + iqother.get(ingredient, 0.)
-            result.add(ingredient, quantity)
-        result.update_properties()
-        result.save()
-        return result
+        iq = defaultdict(int)
+        for i, q in [*self, *other]:
+            iq[i] += q
+        try:
+            with transaction.atomic():
+                return Mixture.new(self.title, iq.items())
+        except IntegrityError:
+            return Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
 
-    @transaction.atomic
     def __sub__(self, other):
-        result = Mixture(title=self.title)
-        result.save()
-        iqother = dict(other.ingredient_quantities)
-        for ingredient, quantity in self.ingredient_quantities:
-            quantity = quantity - iqother.get(ingredient, 0.)
-            result.add(ingredient, quantity)
-        result.update_properties()
-        result.save()
-        return result
+        iq = defaultdict(int)
+        for i, q in self:
+            iq[i] += q
+        for i, q in other:
+            iq[i] -= q
+        try:
+            with transaction.atomic():
+                return Mixture.new(self.title, iq.items())
+        except IntegrityError:
+            return Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
 
 
 class MixtureIngredient(models.Model):
@@ -386,9 +382,14 @@ class Instruction(models.Model):
 
 class Recipe(Hash32Model):
     title = models.CharField(max_length=128)
-    mixtures = models.ManyToManyField(
+    overall = models.ForeignKey(Mixture, models.CASCADE, null=True,
+                                db_index=False)
+    final = models.ForeignKey(Mixture, models.SET_NULL, null=True,
+                              db_index=False, related_name='+')
+    deductible = models.ManyToManyField(
         Mixture,
-        db_table='recipe_mixture'
+        db_table='recipe_deductible',
+        related_name='recipes'
         )
     instructions = models.ManyToManyField(
         Instruction,
@@ -397,25 +398,12 @@ class Recipe(Hash32Model):
     # TODO: Evaluate hash based on mixtures and instructions
     hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.overall = None
-        self.final = None
-        self.deductible = []
-
     class Meta:
         db_table = 'recipe'
 
     def evaluate_hash(self, *args, **kwargs):
-        args = args or list(filter(None, (self.overall, self.deductible)))
-        if not args:
-            self.populate_mixtures()
-            args = self.overall, self.deductible
+        args = args or list(filter(None, (self.overall, self.deductible.all())))
         return self.evaluate_hash_static(*args, **kwargs)
-
-    def populate_mixtures(self):
-        self.overall = self.mixtures.get(dependent=1)
-        self.deductible = self.mixtures.filter(dependent=0)
 
     @update_properties_and_save
     def add_overall_formula(self, ingredient_quantity, unit='[gr]',
@@ -427,22 +415,21 @@ class Recipe(Hash32Model):
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
         """
-        with transaction.atomic():
-            try:
+        try:
+            with transaction.atomic():
                 self.overall = Mixture.new(
-                    'Overall formula', ingredient_quantity, unit, True, mixtures
+                    'Overall formula', ingredient_quantity, unit, mixtures
                     )
-            except IntegrityError:
-                # We allow here duplicate overall formula, for the case
-                # of different deductible mixtures included. The integrity
-                # check is delegated to `Recipe.new`.
-                hash32 = Mixture.evaluate_hash_static(
-                    Mixture.aggregate_ingredient_quantities(
-                        ingredient_quantity, *(mixtures or [])
-                        )
+        except IntegrityError:
+            # We allow here duplicate overall formula, for the case
+            # of different deductible mixtures included. The integrity
+            # check is delegated to `Recipe.new`.
+            hash32 = Mixture.evaluate_hash_static(
+                Mixture.aggregate_ingredient_quantities(
+                    ingredient_quantity, *(mixtures or [])
                     )
-                self.overall = Mixture.objects.get(hash32=hash32)
-        self.mixtures.add(self.overall)
+                )
+            self.overall = Mixture.objects.get(hash32=hash32)
 
     @update_properties_and_save
     def add_deductible_mixture(self, title, ingredient_quantity, unit='[gr]',
@@ -462,31 +449,34 @@ class Recipe(Hash32Model):
         if is_loaded:
             to_add = ingredient_quantity
         else:
-            with transaction.atomic():
-                try:
+            try:
+                with transaction.atomic():
                     to_add = Mixture.new(title, ingredient_quantity, unit,
                                          mixtures=mixtures)
-                except IntegrityError:
-                    # Mixture exists, but we allow recipes with identical mixture
-                    # components. We delegate the integrity check to `Recipe.new`.
-                    hash32 = Mixture.evaluate_hash_static(
-                        Mixture.aggregate_ingredient_quantities(
-                            ingredient_quantity, *(mixtures or [])
-                            )
+            except IntegrityError:
+                # Mixture exists, but we allow recipes with identical mixture
+                # components. We delegate the integrity check to `Recipe.new`.
+                hash32 = Mixture.evaluate_hash_static(
+                    Mixture.aggregate_ingredient_quantities(
+                        ingredient_quantity, *(mixtures or [])
                         )
-                    to_add = Mixture.objects.get(hash32=hash32)
+                    )
+                to_add = Mixture.objects.get(hash32=hash32)
 
-        self.mixtures.add(to_add)
-        self.deductible.append(to_add)
+        self.deductible.add(to_add)
 
     def calculate_final(self):
         # TODO: Probably need to deep-copy here
         self.final = self.overall
-        for mixture in self.deductible:
-            self.final -= mixture
+        for mixture in self.deductible.all():
+            self.final = self.final - mixture
         self.final.title = 'Final'
         self.final.update_properties()
-        self.final.save()
+        try:
+            with transaction.atomic():
+                self.final.save()
+        except IntegrityError:
+            self.final = Mixture.get_by_key(self.final.hash32)
 
     @classmethod
     @transaction.atomic
@@ -530,7 +520,7 @@ class Recipe(Hash32Model):
                                    mixtures=nested.get('overall'), atomic=False)
         i = 0
         nested_deductible = nested.get('partial', [])
-        for _title, ingredients in (partial or []) :
+        for _title, ingredients in (partial or []):
             nested_deductible.append(None) # Satisfy existence
                                            # of the index in the function call
                                            # below
@@ -542,6 +532,7 @@ class Recipe(Hash32Model):
         for mixture in (loaded or []):
             recipe.add_deductible_mixture(None, mixture, unit=unit,
                                           atomic=False, is_loaded=True)
+        recipe.calculate_final()
         recipe.update_properties()
         recipe.save()
         return recipe
