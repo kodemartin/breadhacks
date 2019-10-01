@@ -98,8 +98,9 @@ class RecipeFormView(View):
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
         overall_formula = IngredientFormSet(prefix='overall')
-        loadable_mixture = LoadableMixtureForm(Mixture.objects
-                                                      .filter(dependent=0))
+        loadable_mixture = LoadableMixtureForm(
+            Mixture.objects.filter(recipes__isnull=False).distinct()
+            )
         return render(request, self.template_name, {
             'recipe': recipe_form, 'overall': overall_formula,
             'header': 'Add new recipe',
@@ -123,11 +124,8 @@ class RecipeFormView(View):
                                                  [m for _, m in self.partial]+
                                                  self.loaded)
             recipe = Recipe.objects.get(hash32=hash32)
-            return HttpResponse(f'Found duplicate [{recipe.hash32}]')
 
-        return HttpResponse(
-            f'Awesome! Recipe [{recipe.hash32}] saved successfully'
-            )
+        return JsonResponse({str(i): q for i, q in recipe.final})
 
     def validate_overall_data(self, request):
         """Validate the title, unit of the recipe,
