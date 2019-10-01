@@ -7,7 +7,7 @@ function addPartialMixture(btn) {
      * @param Element btn The button that triggers the action
      * @returns Boolean
      */
-    const partialCount = $('.partial-mixture-template').length;
+    let partialCount = $('.partial-mixture-template').length;
     $.get('/recipes/mixture/new', {'prefix': 'partial_' + partialCount},
           function (response) {
               let form = $(response).find('.partial-mixture-template');

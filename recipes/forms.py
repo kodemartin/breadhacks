@@ -3,6 +3,25 @@ from django import forms
 from .models import Ingredient, Mixture, MixtureIngredient, Recipe
 
 
+class LoadableMixtureField(forms.ModelChoiceField):
+
+    def label_from_instance(self, obj):
+        return "%s" % obj.title
+
+
+class LoadableMixtureForm(forms.ModelForm):
+    title = LoadableMixtureField(queryset=Mixture.objects.all(), required=False,
+                                 empty_label="...or load a mixture")
+
+    def __init__(self, queryset, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['title'].queryset = queryset
+
+    class Meta:
+        model = Mixture
+        fields = ['title']
+
+
 class NestedMixtureForm(forms.ModelForm):
     """Nested mixtures are specified as part of a higher-level
     object, such as a recipe. The unit is thus dependent on the
@@ -23,7 +42,7 @@ class MixtureForm(forms.ModelForm):
 
 class MixtureIngredientForm(forms.ModelForm):
 
-    ingredient = forms.ModelChoiceField(Ingredient.objects,
+    ingredient = forms.ModelChoiceField(Ingredient.objects.all(),
                                         empty_label='Choose ingredient...')
     quantity = forms.IntegerField(min_value=1, initial=100)
 
