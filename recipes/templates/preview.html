@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
+
+<div class='container'>
+    <div class='row'>
+        <h2>{{recipe.title}}</h2>
+    </div>
+    <hr>
+    <div class='row'>
+        <div class='col'>
+            <h3>Overall formula</h3>
+        </div>
+    </div>
+    <table class='table table-striped'>
+        <thead>
+            <tr>
+                <th scope="col"></th>
+                <th scope="col">metric</th>
+                <th scope="col"></th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i, q in recipe.overall %}
+            <tr>
+                <td>{{i}}</td>
+                <td>{{q}} {{recipe.overall.unit}}</td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <hr>
+    {% for m in recipe.deductible.all %}
+        <div class='row'>
+            <div class='col'>
+                <h4>{{m.title}}</h4>
+            </div>
+        </div>
+        <table class='table table-striped'>
+            <thead>
+                <tr>
+                    <th scope="col"></th>
+                    <th scope="col">metric</th>
+                    <th scope="col"></th>
+                    <th scope="col"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i, q in m %}
+                <tr>
+                    <td>{{i}}</td>
+                    <td>{{q}} {{m.unit}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <hr>
+    {% endfor %}
+    <table class='table table-striped'>
+        <div class='row'>
+            <div class='col'>
+                <h3>Mise-en-place</h3>
+            </div>
+        </div>
+        <thead>
+            <tr>
+                <th scope="col"></th>
+                <th scope="col">metric</th>
+                <th scope="col"></th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i, q in recipe.final %}
+            <tr>
+                <td>{{i}}</td>
+                {% if q %}
+                <td>{{q}} {{recipe.final.unit}}</td>
+                {% else %}
+                    <td>-</td>
+                {% endif %}
+                <td></td>
+                <td></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+<div>
+
+{% endblock %}

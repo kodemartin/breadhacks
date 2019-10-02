@@ -90,6 +90,19 @@ class LoggedView(View):
         super().__init__(*args, **kwargs)
         self.logger = self.logger or logging.getLogger(self.__class__.__name__)
 
+
+class RecipePreview(LoggedView):
+
+    template_name = 'preview.html'
+
+    def get(self, request, *args, **kwargs):
+        recipe = Recipe.get_by_key(request.GET['key'])
+
+        return render(request, self.template_name, {
+            'recipe': recipe, 'header': f'Recipe: {recipe.title}'
+            })
+
+
 class RecipeFormView(LoggedView):
     template_name = 'new.html'
 
