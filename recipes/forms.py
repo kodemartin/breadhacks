@@ -10,7 +10,8 @@ class LoadableMixtureField(forms.ModelChoiceField):
 
 
 class LoadableMixtureForm(forms.ModelForm):
-    title = LoadableMixtureField(queryset=Mixture.objects.all(), required=False,
+
+    title = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
                                  empty_label="...or load a mixture")
 
     def __init__(self, queryset, *args, **kwargs):
