@@ -31,3 +31,11 @@ function csrfSafeMethod(method) {
     // these HTTP methods do not require CSRF protection
     return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
 }
+
+function sumReducer(accumulator, currentValue) {
+    /**
+     * Reduce function that returns the
+     * sum of the elements of an Array
+     */
+    return accumulator + currentValue;
+}
