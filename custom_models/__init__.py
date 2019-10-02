@@ -46,3 +46,18 @@ class Hash32Model(models.Model):
 
     def update_properties(self):
         self.update_hash()
+
+    @classmethod
+    def get_by_key(cls, key):
+        """Return an object by querying the database
+        for the specified key. The method first
+        checks the `id` and then the `hash32` field.
+
+        :param key: The key to lookup
+        :type key: int or str
+        :rtype: Mixture
+        :raises DoesNotExist: If not object is found
+            in the database.
+        """
+        Q = models.Q
+        return cls.objects.get(Q(id=key) | Q(hash32=key))
