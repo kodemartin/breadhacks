@@ -210,7 +210,7 @@ class RecipeFormView(View):
         title, ingredient_quantity = self.analyze_mixture(header, ingredients)
         duplicate = Mixture.get_duplicate(ingredient_quantity)
         if duplicate is None:
-            if header.has_changed():
+            if Mixture.objects.filter(title__iexact=title):
                 raise Http404((f'Please provide a different title '
                                f'for edit mixture "{title}"'))
             return self.partial.append((title, ingredient_quantity))
