@@ -1,89 +1,22 @@
-function validateIngredient(ingredientField, valid_ingredients, parentForm) {
-    /**
-     * Check if the ingredient provided in the field
-     * is contained in the set of valid ingredients.
-     *
-     * @param jQuery ingredientField A form field element with the ingredient.
-     * @param Set valid_ingredients Set of the valid ingredient ids
-     */
-    if (! valid_ingredients.has(ingredientField.val())) {
-        if (! parentForm.hasClass("was-validated")) {
-            parentForm.addClass("was-validated");
-        }
-        ingredientField.get(0).setCustomValidity(
-            "Must be one of the ingredients in the overall formula"
-        );
-    } else {
-        ingredientField.get(0).setCustomValidity("");
-    }
-};
-
-function validateIngredients(form) {
-    /**
-     * Validate ingredients of the partial mixtures
-     * within the recipe
-     *
-     * @param jQuery The form element of the recipe
-     */
-    let overall = new Set();
-    let ingredients = $("[id*=ingredient]");
-    // Assume valid ingredients
-    ingredients.each(function() {$(this).get(0).setCustomValidity("");});
-    // Create set of valid ingredients
-    ingredients.filter("[id*=overall]").each(function() {
-        if ($(this).val() !== "") {
-            overall.add($(this).val());
-        }
-    });
-    // Cross validate ingredients of partial and loaded
-    // mixtures
-    ingredients.filter("[id*=partial]").each(function() {
-        validateIngredient($(this), overall, form);
-    });
-    ingredients.filter("[id*=loadable]").each(function() {
-        validateIngredient($(this), overall, form);
-    });
-};
-
-function validateQuantities(form) {
-    /**
-     * Ensure that the sum quantity of the overall formula
-     * is greater than or equal to the sum of the quantities
-     * of all partial and loaded mixtures.
-     *
-     * @param jQuery form
-     */
-    let quantities = form.find("[id*=quantity]");
-    // Evaluate the total sum
-    let overall = quantities.filter("[id*=overall]").map(function() {
-        return parseFloat($(this).val())
-    }).get();
-    let totalSum = overall.reduce(sumReducer, 0.);
-    alert(JSON.stringify(totalSum));
-    // Find the sum of all partial mixtures
-    let partialQuantities = quantities.filter(":not([id*=overall])");
-    let partial = partialQuantities.map(function() {
-        return parseFloat($(this).val());
-    }).get();
-    let partialSum = partial.reduce(sumReducer, 0.);
-    alert(JSON.stringify(partialSum));
-    if (partialSum > totalSum) {
-        if (! form.hasClass("was-validated")) {
-            form.addClass("was-validated");
-        }
-        partialQuantities.each(function() {
-            $(this).get(0).setCustomValidity(
-                "Quantities greater than total sum of overall formula"
-            )
-        })
-    } else {
-        partialQuantities.each(function() {
-            $(this).get(0).setCustomValidity("")
-        });
-    }
-};
-
 function validatePartialIngredients(form) {
+    /**
+     * Check that the ingredients in any partial or
+     * loaded mixture satisfy the following constraints:
+     *
+     *  - They are included in the overall formula.
+     *  - Their quantity in any single mixture is
+     *    less than the overall quantity.
+     *  - The sum of their quantities throughout all
+     *    partial or loaded mixtures is less than
+     *    the overall quantity.
+     *
+     *  Otherwise the respective fields are marked
+     *  as invalid, following bootstrap form-validation
+     *  rules, with the help of `Field.setCustomValidity`
+     *  method.
+     *
+     *  @param jQuery form
+     */
     let ingredients = form.find("[id*='ingredient']");
     // Construct the overall ingredient-quantity map
     let overall = ingredients.filter("[id*='overall']");
@@ -94,16 +27,19 @@ function validatePartialIngredients(form) {
         overallIQ.set(I, Q);
         });
     // Validate ingredients of the partial mixture
-    console.log(JSON.stringify(Array.from(overallIQ.keys())));
     let partial = ingredients.filter(":not([id*='overall'])");
+    let partialIQ = new Map(); // Map ingredient values to an iterable
+                               // of quantity-field elements.
     let errorCount = 0;
     partial.each(function() {
         let i = $(this).val();
-        console.log(i);
-        console.log(overallIQ.has(i));
         if (overallIQ.has(i)) {
             let q = $(this).parent().next().find("[id*='quantity']");
-            console.log(q);
+            if (partialIQ.get(i)) {
+                partialIQ.get(i).push(q);
+            } else {
+                partialIQ.set(i, [q,]);
+            }
             if (overallIQ.get(i) < parseFloat(q.val())) {
                 q.get(0).setCustomValidity(
                     "Should be less that the quantity in the overall formula"
@@ -114,6 +50,22 @@ function validatePartialIngredients(form) {
             $(this).get(0).setCustomValidity(
                 "Must be one of the ingredients in the overall formula"
             );
+            errorCount += 1;
+        }
+    });
+    // Ensure that the sum of ingredients in the partial mixture
+    // is less than or equal to the respective quantity in the
+    // overall formula
+    partialIQ.forEach(function(v, k, map) {
+        let pSum = v.reduce(
+            (acc, cur) => acc + parseFloat(cur.val()), 0.
+        );
+        if (pSum > overallIQ.get(k)) {
+            v.forEach(function(item) {
+                item.get(0).setCustomValidity(
+                    "Sum should be less that the quantity in the overall formula"
+                );
+            });
             errorCount += 1;
         }
     });
