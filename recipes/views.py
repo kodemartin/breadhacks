@@ -80,11 +80,31 @@ def load_mixture(request):
         })
 
 
-
-class RecipeFormView(View):
-    template_name = 'new.html'
-
+class LoggedView(View):
+    """Subclass of `View` with a class-level
+    logger cached at first instantiation.
+    """
     logger = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = self.logger or logging.getLogger(self.__class__.__name__)
+
+
+class RecipePreview(LoggedView):
+
+    template_name = 'preview.html'
+
+    def get(self, request, *args, **kwargs):
+        recipe = Recipe.get_by_key(request.GET['key'])
+
+        return render(request, self.template_name, {
+            'recipe': recipe, 'header': f'Recipe: {recipe.title}'
+            })
+
+
+class RecipeFormView(LoggedView):
+    template_name = 'new.html'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -93,7 +113,6 @@ class RecipeFormView(View):
         self.ingredients = None
         self.partial = []
         self.loaded = []
-        self.logger = self.logger or logging.getLogger(self.__class__.__name__)
 
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')

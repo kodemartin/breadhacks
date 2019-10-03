@@ -13,4 +13,5 @@ urlpatterns = [
     path('mixture/list/ingredients', views.list_mixture_ingredients,
          name='mixture-list-ingredients'),
     path('new/', views.RecipeFormView.as_view(), name='recipe-new'),
+    path('preview/', views.RecipePreview.as_view(), name='recipe-preview'),
 ]
