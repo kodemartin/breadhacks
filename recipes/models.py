@@ -87,9 +87,47 @@ class Mixture(Hash32Model):
         super().__init__(*args, **kwargs)
         self._ingredient_quantities = None
         self._ingredient_normquantities = None
+        self._factor = 1.
+        self._total_yield = None
 
     def __iter__(self):
         return self.iter_ingredient_quantities()
+
+    @property
+    def total_yield(self):
+        """The sum of the ingredient quantities
+
+        :rtype: float
+        """
+        if self._total_yield is None:
+            self._total_yield = sum([q for _, q in self]) or None
+        return self._total_yield
+
+    @property
+    def factor(self):
+        """A multiplication factor for the quantities
+        of the mixture.
+
+        :rtype: float
+        """
+        return self._factor
+
+    @factor.setter
+    def factor(self, value):
+        self._factor = value
+
+    def reset_factor(self, *ingredient_quantity):
+        """Reset the mixture factor based on an
+        analogous set of ingredient-quantities.
+
+        :param list ingredient_quantity: A sequence of
+            iterables with ``(Ingredient, <quantity>)``
+            2-tuples.
+        """
+        current = 0.
+        for iq in ingredient_quantity:
+            current += sum([q for _, q in iq])
+        self.factor = current / self.total_yield
 
     @property
     def ingredient_quantities(self):
@@ -214,7 +252,7 @@ class Mixture(Hash32Model):
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
         for mi in self.iter_mixture_ingredients():
-            yield (mi.ingredient, mi.quantity)
+            yield (mi.ingredient, mi.quantity*self.factor)
 
     @staticmethod
     def normalize(ingredient_quantity, reference='flour'):
@@ -332,7 +370,9 @@ class Mixture(Hash32Model):
             with transaction.atomic():
                 return Mixture.new(self.title, iq.items())
         except IntegrityError:
-            return Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
+            mixture = Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
+            mixture.reset_factor(iq.items())
+            return mixture
 
     def __sub__(self, other):
         iq = defaultdict(int)
@@ -344,7 +384,9 @@ class Mixture(Hash32Model):
             with transaction.atomic():
                 return Mixture.new(self.title, iq.items())
         except IntegrityError:
-            return Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
+            mixture = Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
+            mixture.reset_factor(iq.items())
+            return mixture
 
 
 class MixtureIngredient(models.Model):
@@ -386,6 +428,10 @@ class Recipe(Hash32Model):
     class Meta:
         db_table = 'recipe'
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.factors = {} # {<mixture-id>: <factor>}
+
     def evaluate_hash(self, *args, **kwargs):
         args = args or list(filter(None, (self.overall, self.deductible.all())))
         return self.evaluate_hash_static(*args, **kwargs)
@@ -409,12 +455,13 @@ class Recipe(Hash32Model):
             # We allow here duplicate overall formula, for the case
             # of different deductible mixtures included. The integrity
             # check is delegated to `Recipe.new`.
-            hash32 = Mixture.evaluate_hash_static(
-                Mixture.aggregate_ingredient_quantities(
-                    ingredient_quantity, *(mixtures or [])
-                    )
+            ingredients = Mixture.aggregate_ingredient_quantities(
+                ingredient_quantity, *(mixtures or [])
                 )
+            hash32 = Mixture.evaluate_hash_static(ingredients)
             self.overall = Mixture.objects.get(hash32=hash32)
+            self.overall.reset_factor(ingredients)
+            self.factors[self.overall.id] = self.overall.factor
 
     @update_properties_and_save
     def add_deductible_mixture(self, title, ingredient_quantity, unit='[gr]',
@@ -441,19 +488,21 @@ class Recipe(Hash32Model):
             except IntegrityError:
                 # Mixture exists, but we allow recipes with identical mixture
                 # components. We delegate the integrity check to `Recipe.new`.
-                hash32 = Mixture.evaluate_hash_static(
-                    Mixture.aggregate_ingredient_quantities(
-                        ingredient_quantity, *(mixtures or [])
-                        )
+                ingredients = Mixture.aggregate_ingredient_quantities(
+                    ingredient_quantity, *(mixtures or [])
                     )
+                hash32 = Mixture.evaluate_hash_static(ingredients)
                 to_add = Mixture.objects.get(hash32=hash32)
+                to_add.reset_factor(ingredients)
 
+        self.factors[to_add.id] = to_add.factor
         self.deductible.add(to_add)
 
     def calculate_final(self):
         # TODO: Probably need to deep-copy here
         self.final = self.overall
         for mixture in self.deductible.all():
+            mixture.factor = self.factors.get(mixture.id, 1.)
             self.final = self.final - mixture
         self.final.title = 'Final'
         self.final.update_properties()
