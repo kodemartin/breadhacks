@@ -14,35 +14,28 @@ class TestIngredient(TestCase):
         null = Ingredient.get(name='Bread flour', _type='meal')
         self.assertIsNone(null)
 
+
 class TestMixture(TestCase):
 
     def setUp(self):
-        self.m1 = {
-            ('Bread flour',): 1000,
-            ('Water',): 700,
-            ('Salt',): 20
-            }
-        self.m2 = {
-            ('Bread flour',): 1000,
-            ('Water',): 700,
-            ('Salt',): 18
-            }
-        self.m3 = dict(self.m1)
-        self.m3[('Durum wheat', )] = 110.
+        ingredients = [Ingredient.objects.get(name__istartswith=f'{n}')
+                       for n in ('bread', 'water', 'salt', 'durum')]
+        self.m1 = list(zip(ingredients, (1000, 700, 20)))
+        self.m2 = list(zip(ingredients, (1000, 700, 18)))
+        self.m3 = self.m1 + [(ingredients[-1], 110)]
 
     def test_new(self):
         m = Mixture.new(ingredient_quantity=self.m1)
         self.assertIsInstance(m, Mixture)
         mstored = Mixture.objects.get(pk=m.id)
-        actual = {(i.name,): q for i, q in mstored.ingredient_quantities}
-        self.assertDictEqual(actual, self.m1)
+        actual = list(mstored)
+        self.assertListEqual(actual, self.m1)
         m2 = Mixture.new(ingredient_quantity=self.m2)
         self.assertIsInstance(m2, Mixture)
 
     def test_get_duplicate(self):
         m1 = Mixture.new(ingredient_quantity=self.m1)
-        instance_quantity = Mixture.construct_instance_quantity(self.m1)
-        m = Mixture.get_duplicate(instance_quantity)
+        m = Mixture.get_duplicate(m1)
         self.assertEqual(m.id, m1.id)
         self.assertEqual(m.hash32, m1.hash32)
 
@@ -75,9 +68,9 @@ class TestMixture(TestCase):
         m2 = Mixture.new(ingredient_quantity=self.m2, mixtures=(m1, ))
         m3 = Mixture.new(ingredient_quantity=self.m3, mixtures=(m2, ))
         expected = {
-            Ingredient.get('Bread flour'): 2000,
-            Ingredient.get('Water'): 1400,
-            Ingredient.get('Salt'): 38,
+            Ingredient.get('Bread flour'): 3000,
+            Ingredient.get('Water'): 2100,
+            Ingredient.get('Salt'): 58,
             Ingredient.get('Durum wheat'): 110.
             }
         self.assertDictEqual(dict(m3.ingredient_quantities), expected)
