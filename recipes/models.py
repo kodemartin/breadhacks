@@ -60,6 +60,15 @@ class Ingredient(Hash32Model):
         return self.hash32
 
 
+class MixtureRecursive(models.Model):
+    primary = models.ForeignKey('Mixture', models.CASCADE)
+    nested = models.ForeignKey('Mixture', models.CASCADE, related_name='primary')
+    factor = models.FloatField(default=1.)
+
+    class Meta:
+        db_table = 'mixture_nest'
+
+
 class Mixture(Hash32Model):
     UNITS = [
         ('[gr]', 'grams'),
@@ -74,10 +83,11 @@ class Mixture(Hash32Model):
         Ingredient,
         through='MixtureIngredient',
         )
-    mixture = models.ManyToManyField('self')
+    mixture = models.ManyToManyField('self', symmetrical=False,
+                                     related_name='primary_mixture',
+                                     through=MixtureRecursive)
     # TODO: Evaluate hash based on ingredients and quantities
     #       Explore pre_save, post_save signals functionality to this end
-    hash32 = UnsignedIntegerField(default=None, unique=True, null=True)
     unit = models.CharField(max_length=32, choices=UNITS, default='[gr]')
 
     class Meta:
@@ -236,22 +246,23 @@ class Mixture(Hash32Model):
             hsource += str(i.hash32) + str(norm_quantity)
         return farmhash.hash32(hsource)
 
-    def iter_mixture_ingredients(self):
+    def iter_mixture_ingredients(self, include_nested=True):
         through = self.ingredient.through.objects
         for mi in through.filter(mixture=self):
             yield mi
-        for m in self.mixture.all():
-            for mi in through.filter(mixture=m):
-                yield mi
+        if include_nested:
+            for m in self.mixture.all():
+                for mi in m.iter_mixture_ingredients():
+                    yield mi
 
-    def iter_ingredient_quantities(self):
+    def iter_ingredient_quantities(self, include_nested=True):
         """Iterate on couples of ingredients and
         respective quantities that make up this
         mixture.
 
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
-        for mi in self.iter_mixture_ingredients():
+        for mi in self.iter_mixture_ingredients(include_nested):
             yield (mi.ingredient, mi.quantity*self.factor)
 
     @staticmethod
@@ -330,7 +341,7 @@ class Mixture(Hash32Model):
             properties of the mixture.
         """
         for m in mixtures:
-            self.mixtures.add(m)
+            self.mixture.add(m)
 
     @update_properties_and_save
     def add_mixtures(self, mixtures, *, atomic=False):
@@ -342,7 +353,7 @@ class Mixture(Hash32Model):
             properties of the mixture.
         """
         for m in mixtures:
-            self.mixtures.add(m)
+            self.mixture.add(m)
 
     @classmethod
     def get_duplicate(cls, ingredient_quantity):
@@ -407,15 +418,26 @@ class Instruction(models.Model):
         db_table = 'instruction'
 
 
+class RecipeMixture(models.Model):
+    recipe = models.ForeignKey('Recipe', on_delete=models.CASCADE)
+    mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE)
+    factor = models.FloatField(default=1.)
+
+    class Meta:
+        db_table = 'recipe_deductible'
+
+
 class Recipe(Hash32Model):
     title = models.CharField(max_length=128)
     overall = models.ForeignKey(Mixture, models.CASCADE, null=True,
                                 db_index=False)
+    overall_factor = models.FloatField(default=1.)
     final = models.ForeignKey(Mixture, models.SET_NULL, null=True,
                               db_index=False, related_name='+')
+    final_factor = models.FloatField(default=1.)
     deductible = models.ManyToManyField(
         Mixture,
-        db_table='recipe_deductible',
+        through=RecipeMixture,
         related_name='recipes'
         )
     instructions = models.ManyToManyField(
@@ -427,10 +449,6 @@ class Recipe(Hash32Model):
 
     class Meta:
         db_table = 'recipe'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.factors = {} # {<mixture-id>: <factor>}
 
     def evaluate_hash(self, *args, **kwargs):
         args = args or list(filter(None, (self.overall, self.deductible.all())))
@@ -461,7 +479,7 @@ class Recipe(Hash32Model):
             hash32 = Mixture.evaluate_hash_static(ingredients)
             self.overall = Mixture.objects.get(hash32=hash32)
             self.overall.reset_factor(ingredients)
-            self.factors[self.overall.id] = self.overall.factor
+            self.overall_factor = self.overall.factor
 
     @update_properties_and_save
     def add_deductible_mixture(self, title, ingredient_quantity, unit='[gr]',
@@ -495,14 +513,14 @@ class Recipe(Hash32Model):
                 to_add = Mixture.objects.get(hash32=hash32)
                 to_add.reset_factor(ingredients)
 
-        self.factors[to_add.id] = to_add.factor
-        self.deductible.add(to_add)
+        self.deductible.add(mixture=to_add, factor=to_add.factor)
 
     def calculate_final(self):
         # TODO: Probably need to deep-copy here
         self.final = self.overall
-        for mixture in self.deductible.all():
-            mixture.factor = self.factors.get(mixture.id, 1.)
+        for deductible in self.deductible.all():
+            mixture = deductible.mixture
+            mixture.factor = deductible.factor
             self.final = self.final - mixture
         self.final.title = 'Final'
         self.final.update_properties()
@@ -510,7 +528,10 @@ class Recipe(Hash32Model):
             with transaction.atomic():
                 self.final.save()
         except IntegrityError:
+            current_analogy = list(self.final)
             self.final = Mixture.get_by_key(self.final.hash32)
+            self.final.reset_factor(current_analogy)
+            self.final_factor = self.final.factor
 
     @classmethod
     @transaction.atomic
