@@ -538,7 +538,7 @@ class Recipe(Hash32Model):
             })
 
     def calculate_final(self):
-        self.final = self.overall
+        self.final = self.overall.multiply(self.overall_factor)
         for mixture, factor in self.iter_deductible_factor():
             self.final = self.final - mixture.multiply(factor)
         self.final.title = 'Final'

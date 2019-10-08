@@ -122,7 +122,7 @@ class TestRecipe(TestCase):
 
     def setUp(self):
         self.ingredients = [Ingredient.objects.get(name__istartswith=f'{n}')
-                       for n in ('bread', 'water', 'salt', 'durum')]
+                            for n in ('bread', 'water', 'salt', 'durum')]
         self.overall = list(zip(self.ingredients, (1000, 700, 20)))
 
     def create_test_recipe(self):
@@ -158,6 +158,14 @@ class TestRecipe(TestCase):
         recipe = self.create_test_recipe()
         recipe.add_overall_formula(overall)
         self.assertEqual(recipe.overall_factor, factor)
+
+        partial = list(zip(self.ingredients[:2], (100, 100)))
+        recipe.add_deductible_mixture('partial', partial)
+
+        recipe.calculate_final()
+        expected = dict(zip(self.ingredients[:3], (1900., 1300, 40)))
+        actual = dict(recipe.final)
+        self.assertDictEqual(expected, actual)
 
     def test_add_deductible_mixture(self):
         recipe = self.create_test_recipe()
