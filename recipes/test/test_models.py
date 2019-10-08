@@ -1,7 +1,8 @@
+from django.db import IntegrityError
 from django.test import TestCase
 from farmhash import hash32
 
-from recipes.models import Ingredient, Mixture
+from recipes.models import Ingredient, Mixture, Recipe
 
 
 class TestIngredient(TestCase):
@@ -110,16 +111,110 @@ class TestMixture(TestCase):
         self.assertDictEqual(dict(m1.ingredient_quantities), expected)
         self.assertNotEqual(m1.hash32, initial_hash)
 
+    def test_evaluate_factor(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        factor = 2.
+        duplicate = [(i, factor*q) for i, q in self.m1]
+        self.assertEqual(m1.evaluate_factor(duplicate), factor)
+
 
 class TestRecipe(TestCase):
 
     def setUp(self):
-        self.overall = {
-            ('Bread flour',): 1000,
-            ('Water',): 700,
-            ('Salt',): 20
-            }
-        self.culture = {
-            ('Bread flour',): 1000,
-            ('Water',): 600,
-            }
+        self.ingredients = [Ingredient.objects.get(name__istartswith=f'{n}')
+                       for n in ('bread', 'water', 'salt', 'durum')]
+        self.overall = list(zip(self.ingredients, (1000, 700, 20)))
+
+    def create_test_recipe(self):
+        recipe = Recipe(title='test')
+        recipe.save()
+        return recipe
+
+    def create_mixture(self, ingredient_quantity, title='test'):
+        """Save an instance of a Mixture relation
+        to the test database.
+
+        :param iterable ingredient_quantity: ``(Ingredient, <quantity>)``
+        :rtype: Mixture
+        """
+        return Mixture.new(title, ingredient_quantity)
+
+    def test_add_overall_formula(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        self.assertIsInstance(recipe.overall, Mixture)
+
+        expected_hash = Mixture.evaluate_hash_static(self.overall)
+        actual_hash = recipe.overall.hash32
+        self.assertEqual(expected_hash, actual_hash)
+
+    def test_add_duplicate_overall_formula(self):
+        factor = 2.
+        overall = [(i, factor*q) for i, q in self.overall]
+
+        m = self.create_mixture(self.overall, 'prior')
+
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(overall)
+        self.assertEqual(recipe.overall_factor, factor)
+
+    def test_add_deductible_mixture(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        partial = list(zip(self.ingredients[:2], (300., 300.)))
+        recipe.add_deductible_mixture('test-partial', partial)
+
+        deductibles = recipe.deductible.all()
+        self.assertEqual(len(deductibles), 1)
+
+        hash32 = Mixture.evaluate_hash_static(partial)
+        self.assertEqual(deductibles[0].hash32, hash32)
+
+    def test_add_duplicate_deductible_mixture(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        prior = list(zip(self.ingredients[:2], (300., 300.)))
+        m = self.create_mixture(prior, 'prior')
+
+        factor = 2.
+        partial = [(i, factor*q) for i, q in prior]
+        recipe.add_deductible_mixture('test-partial', partial)
+
+        deductible = list(recipe.iter_deductible_factor())
+        self.assertEqual(len(deductible), 1)
+        stored_mixture, stored_factor = deductible[0]
+        self.assertAlmostEqual(stored_mixture.hash32, m.hash32)
+        self.assertAlmostEqual(stored_factor, factor)
+
+    def test_calculate_final(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        partial = list(zip(self.ingredients[:2], (300., 300.)))
+        recipe.add_deductible_mixture('test-partial', partial)
+
+        recipe.calculate_final()
+        expected = dict(zip(self.ingredients[:3], (700, 400, 20)))
+        actual = dict(recipe.final)
+        self.assertDictEqual(actual, expected)
+
+    def test_calculate_duplicate_final(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        partial = list(zip(self.ingredients[:2], (300., 300.)))
+        recipe.add_deductible_mixture('test-partial', partial)
+
+        prior_iq = zip(self.ingredients[:3], (350, 200, 10))
+        prior = self.create_mixture(prior_iq, 'prior')
+
+        recipe.calculate_final()
+
+        expected = dict(zip(self.ingredients[:3], (350, 200, 10)))
+        actual = dict(recipe.final)
+        self.assertDictEqual(actual, expected)
+
+        self.assertEqual(recipe.final_factor, 2.)

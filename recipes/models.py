@@ -2,6 +2,7 @@ import farmhash
 
 from collections import defaultdict
 from django.db import models, transaction, IntegrityError
+from django.utils.functional import cached_property
 from custom_fields import UnsignedIntegerField
 from custom_models import Hash32Model, update_properties_and_save
 
@@ -97,11 +98,21 @@ class Mixture(Hash32Model):
         super().__init__(*args, **kwargs)
         self._ingredient_quantities = None
         self._ingredient_normquantities = None
-        self._factor = 1.
         self._total_yield = None
 
     def __iter__(self):
         return self.iter_ingredient_quantities()
+
+    def multiply(self, factor):
+        """Multiply the quantities of the ingredients
+        by a given factor.
+
+        :param float factor: The multiplication factor.
+        :rtype: Mixture
+        """
+        self.ingredient_quantities = [(i, factor*q) for i, q in self]
+        self.total_yield *= factor
+        return self
 
     @property
     def total_yield(self):
@@ -113,31 +124,27 @@ class Mixture(Hash32Model):
             self._total_yield = sum([q for _, q in self]) or None
         return self._total_yield
 
-    @property
-    def factor(self):
-        """A multiplication factor for the quantities
-        of the mixture.
-
-        :rtype: float
+    @total_yield.setter
+    def total_yield(self, value):
         """
-        return self._factor
+        :param float value:
+        """
+        self._total_yield = value
 
-    @factor.setter
-    def factor(self, value):
-        self._factor = value
-
-    def reset_factor(self, *ingredient_quantity):
-        """Reset the mixture factor based on an
-        analogous set of ingredient-quantities.
+    def evaluate_factor(self, *ingredient_quantity):
+        """Evaluate the factor of an
+        analogous set of ingredient-quantities with respect
+        to this mixture.
 
         :param list ingredient_quantity: A sequence of
             iterables with ``(Ingredient, <quantity>)``
             2-tuples.
+        :rtype: float
         """
         current = 0.
         for iq in ingredient_quantity:
             current += sum([q for _, q in iq])
-        self.factor = current / self.total_yield
+        return current / self.total_yield
 
     @property
     def ingredient_quantities(self):
@@ -175,6 +182,7 @@ class Mixture(Hash32Model):
         quantities.
         """
         self._ingredient_quantities = self.aggregate_ingredient_quantities(self)
+        self._total_yield = None
 
     @staticmethod
     def sort(ingredient_quantity):
@@ -227,24 +235,36 @@ class Mixture(Hash32Model):
         return self.evaluate_hash_static(self.ingredient_quantities)
 
     @classmethod
-    def evaluate_hash_static(cls, ingredient_quantities):
+    def evaluate_hash_static(cls, ingredient_quantity):
         """Evaluate the hash of a mixture represented by
         a map between ``Ingredient`` instances and respective
         quantities.
 
         Account also for any nested mixtures given.
 
-        :param list ingredient_quantities: A list of tuples
+        :param list ingredient_quantity: A list of tuples
             ``(Ingrediend, quantity)``.
-        :param nested_mixtures: A sequence of mixture instances or
-            ``(Ingredient, quantity)`` tuples.
         :rtype: int
         """
-        quantities = cls.normalize(cls.sort(ingredient_quantities))
+        quantities = cls.normalize(cls.sort(ingredient_quantity))
         hsource = ''
         for i, norm_quantity in quantities:
             hsource += str(i.hash32) + str(norm_quantity)
         return farmhash.hash32(hsource)
+
+    @classmethod
+    def aggregate_and_hash(cls, *ingredient_quantities):
+        """Aggregate common ingredients among sequences
+        of ingredient-quantity pairs and evaluate
+        their hash.
+
+        :param ingredient_quantities: Sequence of iterables
+            of ``(Ingredient, quantity)`` 2-tuples.
+        :rtype: int
+        """
+        return cls.evaluate_hash_static(
+            cls.aggregate_ingredient_quantities(ingredient_quantities)
+            )
 
     def iter_mixture_ingredients(self, include_nested=True):
         through = self.ingredient.through.objects
@@ -263,7 +283,7 @@ class Mixture(Hash32Model):
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
         for mi in self.iter_mixture_ingredients(include_nested):
-            yield (mi.ingredient, mi.quantity*self.factor)
+            yield (mi.ingredient, mi.quantity)
 
     @staticmethod
     def normalize(ingredient_quantity, reference='flour'):
@@ -375,28 +395,28 @@ class Mixture(Hash32Model):
 
     def __add__(self, other):
         iq = defaultdict(int)
-        for i, q in [*self, *other]:
+        for i, q in [*self.ingredient_quantities, *other.ingredient_quantities]:
             iq[i] += q
         try:
             with transaction.atomic():
                 return Mixture.new(self.title, iq.items())
         except IntegrityError:
             mixture = Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
-            mixture.reset_factor(iq.items())
+            mixture.multiply(mixture.evaluate_factor(iq.items()))
             return mixture
 
     def __sub__(self, other):
         iq = defaultdict(int)
-        for i, q in self:
+        for i, q in self.ingredient_quantities:
             iq[i] += q
-        for i, q in other:
+        for i, q in other.ingredient_quantities:
             iq[i] -= q
         try:
             with transaction.atomic():
                 return Mixture.new(self.title, iq.items())
         except IntegrityError:
             mixture = Mixture.get_by_key(self.evaluate_hash_static(iq.items()))
-            mixture.reset_factor(iq.items())
+            mixture.multiply(mixture.evaluate_factor(iq.items()))
             return mixture
 
 
@@ -454,6 +474,10 @@ class Recipe(Hash32Model):
         args = args or list(filter(None, (self.overall, self.deductible.all())))
         return self.evaluate_hash_static(*args, **kwargs)
 
+    def iter_deductible_factor(self):
+        for instance in self.deductible.through.objects.filter(recipe=self):
+            yield instance.mixture, instance.factor
+
     @update_properties_and_save
     def add_overall_formula(self, ingredient_quantity, unit='[gr]',
                             mixtures=None, *, atomic=True):
@@ -476,10 +500,8 @@ class Recipe(Hash32Model):
             ingredients = Mixture.aggregate_ingredient_quantities(
                 ingredient_quantity, *(mixtures or [])
                 )
-            hash32 = Mixture.evaluate_hash_static(ingredients)
-            self.overall = Mixture.objects.get(hash32=hash32)
-            self.overall.reset_factor(ingredients)
-            self.overall_factor = self.overall.factor
+            self.overall = Mixture.get_duplicate(ingredients)
+            self.overall_factor = self.overall.evaluate_factor(ingredients)
 
     @update_properties_and_save
     def add_deductible_mixture(self, title, ingredient_quantity, unit='[gr]',
@@ -497,7 +519,7 @@ class Recipe(Hash32Model):
             database, so we can avoid the attempt to save it.
         """
         if is_loaded:
-            to_add = ingredient_quantity
+            to_add = Mixture.get_duplicate(ingredient_quantity)
         else:
             try:
                 with transaction.atomic():
@@ -506,32 +528,23 @@ class Recipe(Hash32Model):
             except IntegrityError:
                 # Mixture exists, but we allow recipes with identical mixture
                 # components. We delegate the integrity check to `Recipe.new`.
-                ingredients = Mixture.aggregate_ingredient_quantities(
+                ingredient_quantity = Mixture.aggregate_ingredient_quantities(
                     ingredient_quantity, *(mixtures or [])
                     )
-                hash32 = Mixture.evaluate_hash_static(ingredients)
-                to_add = Mixture.objects.get(hash32=hash32)
-                to_add.reset_factor(ingredients)
+                to_add = Mixture.get_duplicate(ingredient_quantity)
 
-        self.deductible.add(mixture=to_add, factor=to_add.factor)
+        self.deductible.add(to_add, through_defaults={
+            'factor': to_add.evaluate_factor(ingredient_quantity)
+            })
 
     def calculate_final(self):
-        # TODO: Probably need to deep-copy here
         self.final = self.overall
-        for deductible in self.deductible.all():
-            mixture = deductible.mixture
-            mixture.factor = deductible.factor
-            self.final = self.final - mixture
+        for mixture, factor in self.iter_deductible_factor():
+            self.final = self.final - mixture.multiply(factor)
         self.final.title = 'Final'
-        self.final.update_properties()
-        try:
-            with transaction.atomic():
-                self.final.save()
-        except IntegrityError:
-            current_analogy = list(self.final)
-            self.final = Mixture.get_by_key(self.final.hash32)
-            self.final.reset_factor(current_analogy)
-            self.final_factor = self.final.factor
+        calculated_analogy = self.final.ingredient_quantities
+        self.final.cache_ingredient_quantities()
+        self.final_factor = self.final.evaluate_factor(calculated_analogy)
 
     @classmethod
     @transaction.atomic
