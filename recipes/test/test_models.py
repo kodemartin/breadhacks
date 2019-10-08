@@ -226,3 +226,19 @@ class TestRecipe(TestCase):
         self.assertDictEqual(actual, expected)
 
         self.assertEqual(recipe.final_factor, 2.)
+
+    def test_add_loaded_deductible(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        prior = zip(self.ingredients[:2], (300., 300.))
+        m = self.create_mixture(prior, 'prior')
+
+        factor = 2.
+        recipe.add_deductible_mixture(None, m.multiply(factor), atomic=False,
+                                      is_loaded=True)
+        deductible = list(recipe.iter_deductible_factor())
+        self.assertEqual(len(deductible), 1)
+        stored_mixture, stored_factor = deductible[0]
+        self.assertEqual(stored_mixture.hash32, m.hash32)
+        self.assertEqual(stored_factor, factor)

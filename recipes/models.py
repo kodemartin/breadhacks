@@ -510,7 +510,8 @@ class Recipe(Hash32Model):
         be deducted from the overall formula.
 
         :param str title: Title of the mixture.
-        :param iterable ingredient_quantity:
+        :param iterable ingredient_quantity: Iterable of ``(Ingredient,
+            <quantity>)`` pairs.
         :param str unit:
         :param mixtures:
         :type mixtures: iterable(Mixture) or None
@@ -519,12 +520,15 @@ class Recipe(Hash32Model):
             database, so we can avoid the attempt to save it.
         """
         if is_loaded:
-            to_add = Mixture.get_duplicate(ingredient_quantity)
+            to_add = ingredient_quantity
+            to_add.total_yield = None
+            factor = to_add.evaluate_factor(to_add.ingredient_quantities)
         else:
             try:
                 with transaction.atomic():
                     to_add = Mixture.new(title, ingredient_quantity, unit,
                                          mixtures=mixtures)
+                    factor = 1.
             except IntegrityError:
                 # Mixture exists, but we allow recipes with identical mixture
                 # components. We delegate the integrity check to `Recipe.new`.
@@ -532,10 +536,9 @@ class Recipe(Hash32Model):
                     ingredient_quantity, *(mixtures or [])
                     )
                 to_add = Mixture.get_duplicate(ingredient_quantity)
+                factor = to_add.evaluate_factor(ingredient_quantity)
 
-        self.deductible.add(to_add, through_defaults={
-            'factor': to_add.evaluate_factor(ingredient_quantity)
-            })
+        self.deductible.add(to_add, through_defaults={'factor': factor})
 
     def calculate_final(self):
         self.final = self.overall.multiply(self.overall_factor)
