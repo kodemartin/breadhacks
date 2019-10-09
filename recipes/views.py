@@ -125,9 +125,9 @@ class RecipeFormView(LoggedView):
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
         overall_formula = IngredientFormSet(prefix='overall')
-        loadable_mixture = LoadableMixtureForm(
-            Mixture.objects.filter(recipes__isnull=False).distinct()
-            )
+        loadable_mixture = LoadableMixtureForm(Mixture.objects.exclude(
+            title__istartswith='final'
+            ))
         return render(request, self.template_name, {
             'recipe': recipe_form, 'overall': overall_formula,
             'header': 'Add new recipe',
