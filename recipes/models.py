@@ -541,13 +541,17 @@ class Recipe(Hash32Model):
         self.deductible.add(to_add, through_defaults={'factor': factor})
 
     def calculate_final(self):
-        self.final = self.overall.multiply(self.overall_factor)
+        self.overall.multiply(self.overall_factor)
+        final_iq = dict(self.overall.ingredient_quantities)
         for mixture, factor in self.iter_deductible_factor():
-            self.final = self.final - mixture.multiply(factor)
-        self.final.title = 'Final'
-        calculated_analogy = self.final.ingredient_quantities
-        self.final.cache_ingredient_quantities()
-        self.final_factor = self.final.evaluate_factor(calculated_analogy)
+            for i, q in mixture:
+                final_iq[i] -= q*factor
+        try:
+            with transaction.atomic():
+                self.final = Mixture.new('Final', final_iq.items())
+        except IntegrityError:
+            self.final = Mixture.get_duplicate(final_iq.items())
+            self.final_factor = self.final.evaluate_factor(final_iq.items())
 
     @classmethod
     @transaction.atomic
