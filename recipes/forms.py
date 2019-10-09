@@ -6,7 +6,16 @@ from .models import Ingredient, Mixture, MixtureIngredient, Recipe
 class LoadableMixtureField(forms.ModelChoiceField):
 
     def label_from_instance(self, obj):
-        return "%s" % obj.title
+        if obj.recipes.all():
+            ref = obj.recipes.all().first().title
+        elif obj.recipe_set.all():
+            ref = obj.recipe_set.all().first().title
+        else:
+            ref = None
+        label = "%s" % obj.title
+        if ref:
+            label = "%s (in '%s')" % (label, ref)
+        return label
 
 
 class LoadableMixtureForm(forms.ModelForm):
