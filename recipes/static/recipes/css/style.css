@@ -1,4 +1,14 @@
 hr {
-    background-color: #0470B2;
-    height: 2px;
+  background-color: #4b6a78;
+  height: 2px;
+}
+
+.table-striped > tbody > tr:nth-child(2n+1) > td, .table-striped > tbody > tr:nth-child(2n+1) > th {
+  background-color: #4b6a78;
+  color: #eee;
+}
+
+.table-striped > tbody > tr:nth-child(2n) > td, .table-striped > tbody > tr:nth-child(2n) > th {
+  background-color: #eee;
+  color: #4b6a78;
 }
