@@ -99,9 +99,11 @@ class RecipePreview(LoggedView):
 
     def get(self, request, *args, **kwargs):
         recipe = Recipe.get_by_key(request.GET['key'])
-        overall = recipe.overall.multiply(recipe.overall_factor)
-        final = recipe.final.multiply(recipe.final_factor)
-        deductible = [m.multiply(f) for m, f in recipe.iter_deductible_factor()]
+        recipe_factor = float(request.GET.get('factor', '1.'))
+        overall = recipe.overall.multiply(recipe.overall_factor*recipe_factor)
+        final = recipe.final.multiply(recipe.final_factor*recipe_factor)
+        deductible = [m.multiply(f*recipe_factor)
+                      for m, f in recipe.iter_deductible_factor()]
 
         return render(request, self.template_name, {
             'overall': overall, 'header': f'Recipe: {recipe.title}',
@@ -144,14 +146,16 @@ class RecipeFormView(LoggedView):
 
         try:
             recipe = self.save_recipe()
+            factor = 1.
         except IntegrityError:
             hash32 = Recipe.evaluate_hash_static(self.ingredients,
                                                  [m for _, m in self.partial]+
                                                  self.loaded)
             recipe = Recipe.objects.get(hash32=hash32)
+            factor = recipe.overall.evaluate_factor(self.ingredients)
 
         redirect_url = reverse('recipe-preview')
-        params = urlencode({'key': recipe.id})
+        params = urlencode({'key': recipe.id, 'factor': factor})
         return redirect(f'{redirect_url}?{params}')
 
     def validate_overall_data(self, request):
