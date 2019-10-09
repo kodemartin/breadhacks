@@ -7,7 +7,7 @@
 
 <div class='container'>
     <div class='row'>
-        <h2>{{recipe.title}}</h2>
+        <h2>{{header}}</h2>
     </div>
     <hr>
     <div class='row'>
@@ -25,10 +25,10 @@
             </tr>
         </thead>
         <tbody>
-            {% for i, q in recipe.overall %}
+            {% for i, q in overall.ingredient_quantities %}
             <tr>
                 <td>{{i}}</td>
-                <td>{{q}} {{recipe.overall.unit}}</td>
+                <td>{{q}} {{overall.unit}}</td>
                 <td></td>
                 <td></td>
             </tr>
@@ -36,7 +36,7 @@
         </tbody>
     </table>
     <hr>
-    {% for m in recipe.deductible.all %}
+    {% for m in deductible %}
         <div class='row'>
             <div class='col'>
                 <h4>{{m.title}}</h4>
@@ -52,7 +52,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for i, q in m %}
+                {% for i, q in m.ingredient_quantities %}
                 <tr>
                     <td>{{i}}</td>
                     <td>{{q}} {{m.unit}}</td>
@@ -79,11 +79,11 @@
             </tr>
         </thead>
         <tbody>
-            {% for i, q in recipe.final %}
+            {% for i, q in final.ingredient_quantities %}
             <tr>
                 <td>{{i}}</td>
                 {% if q %}
-                <td>{{q}} {{recipe.final.unit}}</td>
+                <td>{{q}} {{final.unit}}</td>
                 {% else %}
                     <td>-</td>
                 {% endif %}

@@ -1,11 +1,13 @@
 import logging
 import json
 
+from urllib.parse import urlencode
 from django.http import HttpResponse, Http404, JsonResponse
 from django.db import transaction, IntegrityError
 from django.db.models import Q
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views import defaults, View
+from django.urls import reverse
 
 from .forms import (NestedMixtureForm, MixtureForm, IngredientFormSet,
                     LoadableMixtureForm)
@@ -97,9 +99,13 @@ class RecipePreview(LoggedView):
 
     def get(self, request, *args, **kwargs):
         recipe = Recipe.get_by_key(request.GET['key'])
+        overall = recipe.overall.multiply(recipe.overall_factor)
+        final = recipe.final.multiply(recipe.final_factor)
+        deductible = [m.multiply(f) for m, f in recipe.iter_deductible_factor()]
 
         return render(request, self.template_name, {
-            'recipe': recipe, 'header': f'Recipe: {recipe.title}'
+            'overall': overall, 'header': f'Recipe: {recipe.title}',
+            'final': final, 'deductible': deductible
             })
 
 
@@ -144,7 +150,9 @@ class RecipeFormView(LoggedView):
                                                  self.loaded)
             recipe = Recipe.objects.get(hash32=hash32)
 
-        return JsonResponse({str(i): q for i, q in recipe.final})
+        redirect_url = reverse('recipe-preview')
+        params = urlencode({'key': recipe.id})
+        return redirect(f'{redirect_url}?{params}')
 
     def validate_overall_data(self, request):
         """Validate the title, unit of the recipe,
