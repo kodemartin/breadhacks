@@ -242,3 +242,14 @@ class TestRecipe(TestCase):
         stored_mixture, stored_factor = deductible[0]
         self.assertEqual(stored_mixture.hash32, m.hash32)
         self.assertEqual(stored_factor, factor)
+
+    def test_calculate_final_avoid_saving_intermediate_mixtures(self):
+        recipe = self.create_test_recipe()
+        recipe.add_overall_formula(self.overall)
+
+        partial0 = zip(self.ingredients[:2], (312., 300.))
+        partial1 = zip(self.ingredients, (112., 111., 3.))
+        for p in (partial0, partial1):
+            recipe.add_deductible_mixture('test_p', p, atomic=False)
+        recipe.calculate_final()
+        self.assertEqual(len(Mixture.objects.all()), 4)
