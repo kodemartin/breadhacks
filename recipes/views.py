@@ -1,11 +1,13 @@
 import logging
 import json
 
+from urllib.parse import urlencode
 from django.http import HttpResponse, Http404, JsonResponse
 from django.db import transaction, IntegrityError
 from django.db.models import Q
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views import defaults, View
+from django.urls import reverse
 
 from .forms import (NestedMixtureForm, MixtureForm, IngredientFormSet,
                     LoadableMixtureForm)
@@ -97,9 +99,15 @@ class RecipePreview(LoggedView):
 
     def get(self, request, *args, **kwargs):
         recipe = Recipe.get_by_key(request.GET['key'])
+        recipe_factor = float(request.GET.get('factor', '1.'))
+        overall = recipe.overall.multiply(recipe.overall_factor*recipe_factor)
+        final = recipe.final.multiply(recipe.final_factor*recipe_factor)
+        deductible = [m.multiply(f*recipe_factor)
+                      for m, f in recipe.iter_deductible_factor()]
 
         return render(request, self.template_name, {
-            'recipe': recipe, 'header': f'Recipe: {recipe.title}'
+            'overall': overall, 'header': f'Recipe: {recipe.title}',
+            'final': final, 'deductible': deductible
             })
 
 
@@ -138,13 +146,17 @@ class RecipeFormView(LoggedView):
 
         try:
             recipe = self.save_recipe()
+            factor = 1.
         except IntegrityError:
             hash32 = Recipe.evaluate_hash_static(self.ingredients,
                                                  [m for _, m in self.partial]+
                                                  self.loaded)
             recipe = Recipe.objects.get(hash32=hash32)
+            factor = recipe.overall.evaluate_factor(self.ingredients)
 
-        return JsonResponse({str(i): q for i, q in recipe.final})
+        redirect_url = reverse('recipe-preview')
+        params = urlencode({'key': recipe.id, 'factor': factor})
+        return redirect(f'{redirect_url}?{params}')
 
     def validate_overall_data(self, request):
         """Validate the title, unit of the recipe,
@@ -229,10 +241,8 @@ class RecipeFormView(LoggedView):
         title, ingredient_quantity = self.analyze_mixture(header, ingredients)
         duplicate = Mixture.get_duplicate(ingredient_quantity)
         if duplicate is None:
-            if Mixture.objects.filter(title__iexact=title):
-                raise Http404((f'Please provide a different title '
-                               f'for edit mixture "{title}"'))
             return self.partial.append((title, ingredient_quantity))
+        duplicate.multiply(duplicate.evaluate_factor(ingredient_quantity))
         return self.loaded.append(duplicate)
 
     @staticmethod
