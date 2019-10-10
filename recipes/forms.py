@@ -32,6 +32,15 @@ class LoadableMixtureForm(forms.ModelForm):
         fields = ['title']
 
 
+class DynamicLoadableMixtureForm(LoadableMixtureForm):
+    """Allow specifying the total_yield of the nested mixture
+    specified through this form.
+    """
+    title = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
+                                 empty_label="Choose mixture...")
+    quantity = forms.FloatField(min_value=1., max_value=2<<31)
+
+
 class NestedMixtureForm(forms.ModelForm):
     """Nested mixtures are specified as part of a higher-level
     object, such as a recipe. The unit is thus dependent on the
