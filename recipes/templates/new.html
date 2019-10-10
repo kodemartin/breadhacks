@@ -49,15 +49,15 @@
     {% endfor %}
     <div class='form-row mt-1 nested-mixture hidden'>
         <div class='col'>
-            {{nested_mixture_template.title.errors}}
-            <label class="sr-only" for={{nested_mixture_template.title.id_for_label}}>
-                {{nested_mixture_template.title.label}}
+            {{nested_mixture_template.mixture.errors}}
+            <label class="sr-only" for={{nested_mixture_template.mixture.id_for_label}}>
+                {{nested_mixture_template.mixture.label}}
             </label>
-            {{nested_mixture_template.title|add_class:"form-control mr-1 nm-field"}}
+            {{nested_mixture_template.mixture|add_class:"form-control mr-1 nm-field"}}
         </div>
         <div class='col'>
             {{nested_mixture_template.quantity.errors}}
-            <label class="sr-only" for={{nested_mixture_template.title.id_for_label}}>
+            <label class="sr-only" for={{nested_mixture_template.quantity.id_for_label}}>
                 {{nested_mixture_template.quantity.label}}
             </label>
             {{nested_mixture_template.quantity|add_class:"form-control mr-1 nm-field"}}
