@@ -121,6 +121,7 @@ class RecipeFormView(LoggedView):
         self.ingredients = None
         self.partial = []
         self.loaded = []
+        self.nested = {}
 
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
@@ -161,6 +162,25 @@ class RecipeFormView(LoggedView):
         params = urlencode({'key': recipe.id, 'factor': factor})
         return redirect(f'{redirect_url}?{params}')
 
+    def extract_nested_mixtures(self, request, parent='overall'):
+        base_prefix = f'{parent}_nested'
+        i = 0
+        nested = []
+        while True:
+            current_prefix = f'{base_prefix}_{i}'
+            current = DynamicLoadableMixtureForm(request.POST,
+                                                 prefix=current_prefix)
+            if not current.is_valid():
+                break
+            m, q = map(current.cleaned_data.get, ('mixture', 'quantity'))
+            m.multiply(q/m.total_yield)
+            nested.append(m)
+            self.logger.debug(f'==> Nested {current_prefix}')
+            self.logger.debug(f'==> Nested {m.ingredient_quantities}')
+            i += 1
+        self.nested['overall'] = nested
+        return nested
+
     def validate_overall_data(self, request):
         """Validate the title, unit of the recipe,
         and the ingredients of the overall formula.
@@ -186,6 +206,7 @@ class RecipeFormView(LoggedView):
         self.title = recipe_form.cleaned_data['title']
         self.unit = recipe_form.cleaned_data['unit']
         self.ingredients = list(overall_formula.generate_cleaned_data())
+        self.extract_nested_mixtures(request)
 
     def extract_mixtures(self, request, prefix):
         """Traverse the transmitted forms in the request, to
@@ -320,7 +341,8 @@ class RecipeFormView(LoggedView):
         """
         if self.title and self.ingredients:
             return Recipe.new(self.title, self.ingredients, self.unit,
-                              self.partial, loaded=self.loaded)
+                              self.partial, loaded=self.loaded,
+                              nested=self.nested)
 
 
 def mixture_preview(request):
