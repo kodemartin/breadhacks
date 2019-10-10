@@ -10,7 +10,7 @@ from django.views import defaults, View
 from django.urls import reverse
 
 from .forms import (NestedMixtureForm, MixtureForm, IngredientFormSet,
-                    LoadableMixtureForm)
+                    LoadableMixtureForm, DynamicLoadableMixtureForm)
 from .models import Ingredient, Mixture, Recipe
 
 
@@ -125,13 +125,16 @@ class RecipeFormView(LoggedView):
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
         overall_formula = IngredientFormSet(prefix='overall')
-        loadable_mixture = LoadableMixtureForm(Mixture.objects.exclude(
-            title__istartswith='final'
-            ))
+        mixture_load_pool = Mixture.objects.exclude(title__istartswith='final')
+        loadable_mixture = LoadableMixtureForm(queryset=mixture_load_pool)
+        nested_mixture_template = DynamicLoadableMixtureForm(
+            queryset=mixture_load_pool, prefix='prefix'
+            )
         return render(request, self.template_name, {
             'recipe': recipe_form, 'overall': overall_formula,
             'header': 'Add new recipe',
-            'loadable_mixture': loadable_mixture
+            'loadable_mixture': loadable_mixture,
+            'nested_mixture_template': nested_mixture_template
             })
 
     def post(self, request, *args, **kwargs):
