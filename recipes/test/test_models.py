@@ -117,6 +117,12 @@ class TestMixture(TestCase):
         duplicate = [(i, factor*q) for i, q in self.m1]
         self.assertEqual(m1.evaluate_factor(duplicate), factor)
 
+    def test_factor(self):
+        m1 = Mixture.new(ingredient_quantity=self.m1)
+        factor = 2.
+        m1.multiply(factor)
+        self.assertAlmostEqual(m1.factor, factor)
+
 
 class TestRecipe(TestCase):
 

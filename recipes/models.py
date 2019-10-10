@@ -101,7 +101,9 @@ class Mixture(Hash32Model):
         self._total_yield = None
 
     def __iter__(self):
-        return self.iter_ingredient_quantities()
+        return iter(self.aggregate_ingredient_quantities(
+            self.iter_ingredient_quantities()
+            ))
 
     def multiply(self, factor):
         """Multiply the quantities of the ingredients
@@ -126,10 +128,19 @@ class Mixture(Hash32Model):
 
     @total_yield.setter
     def total_yield(self, value):
-        """
+        """Allow to override stored total-yield for
+        factoring purposes.
+
         :param float value:
         """
         self._total_yield = value
+
+    @property
+    def factor(self):
+        """The ratio between the current total-yield
+        and the stored one.
+        """
+        return self.total_yield / sum([q for _, q in self])
 
     def evaluate_factor(self, *ingredient_quantity):
         """Evaluate the factor of an
@@ -268,12 +279,14 @@ class Mixture(Hash32Model):
 
     def iter_mixture_ingredients(self, include_nested=True):
         through = self.ingredient.through.objects
+        factor = 1.
         for mi in through.filter(mixture=self):
-            yield mi
+            yield mi, factor
         if include_nested:
-            for m in self.mixture.all():
-                for mi in m.iter_mixture_ingredients():
-                    yield mi
+            through = self.mixture.through.objects
+            for nest in through.filter(primary=self):
+                for mi, factor in nest.nested.iter_mixture_ingredients():
+                    yield mi, nest.factor*factor
 
     def iter_ingredient_quantities(self, include_nested=True):
         """Iterate on couples of ingredients and
@@ -282,8 +295,8 @@ class Mixture(Hash32Model):
 
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
-        for mi in self.iter_mixture_ingredients(include_nested):
-            yield (mi.ingredient, mi.quantity)
+        for mi, factor in self.iter_mixture_ingredients(include_nested):
+            yield (mi.ingredient, mi.quantity*factor)
 
     @staticmethod
     def normalize(ingredient_quantity, reference='flour'):
@@ -373,7 +386,8 @@ class Mixture(Hash32Model):
             properties of the mixture.
         """
         for m in mixtures:
-            self.mixture.add(m)
+            factor = m.total_yield / sum([q for _, q in m])
+            self.mixture.add(m, through_defaults={'factor': factor})
 
     @classmethod
     def get_duplicate(cls, ingredient_quantity):
