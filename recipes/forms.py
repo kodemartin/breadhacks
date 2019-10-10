@@ -20,24 +20,24 @@ class LoadableMixtureField(forms.ModelChoiceField):
 
 class LoadableMixtureForm(forms.ModelForm):
 
-    title = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
-                                 empty_label="...or load a mixture")
+    mixture = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
+                                   empty_label="...or load a mixture")
 
-    def __init__(self, queryset, *args, **kwargs):
+    def __init__(self, *args, queryset=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['title'].queryset = queryset
+        self.fields['mixture'].queryset = queryset or Mixture.objects.all()
 
     class Meta:
         model = Mixture
-        fields = ['title']
+        fields = ['mixture']
 
 
 class DynamicLoadableMixtureForm(LoadableMixtureForm):
     """Allow specifying the total_yield of the nested mixture
     specified through this form.
     """
-    title = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
-                                 empty_label="Choose mixture...")
+    mixture = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
+                                   empty_label="Choose mixture...")
     quantity = forms.FloatField(min_value=1., max_value=2<<31)
 
 
