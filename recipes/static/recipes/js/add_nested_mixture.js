@@ -8,15 +8,15 @@ function updatePrefix(el, old, new_) {
     if (el.attr("name")) el.attr("name", el.attr("name").replace(old, new_));
 }
 
-function addNestedMixture(btn, form_class = 'nested-mixture') {
+function addNestedMixture(btn, formClass = 'nested-mixture') {
     let parentFormSet = btn.parents('.formset-dynamic');
-    let baseForm = parentFormSet.find(`.${form_class}`).last();
+    let baseForm = parentFormSet.find(`.${formClass}`).last();
     let newElement = baseForm.clone(true);
     btn.parents('.row').before(newElement);
     // Update prefix
     let parentPrefix = parentFormSet.find('[id*=TOTAL]').attr('id')
                                     .match(/id_(\w+)-TOTAL_\w+/)[1];
-    let idx = parentFormSet.find('.dynamic-mixture').length - 1;
+    let idx = parentFormSet.find(`.${formClass}`).length - 1;
 
     let old = /\d+/;
     let new_ = idx;
