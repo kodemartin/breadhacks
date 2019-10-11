@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
+
+<div class='container'>
+    <div class='row'>
+        <div class='col'>
+            <h2>{{mixture.title}}</h2>
+        </div>
+    </div>
+    <hr>
+    <table class='table table-striped'>
+        <thead>
+            <tr>
+                <th scope="col"></th>
+                <th scope="col">metric</th>
+                <th scope="col"></th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i, q in mixture.ingredient_quantities %}
+            <tr>
+                <td>{{i}}</td>
+                <td>{{q|floatformat:"-2"}} {{mixture.unit}}</td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% endfor %}
+            {% for m in nested %}
+            <tr>
+                <td>{{m.title}}</td>
+                <td>{{m.total_yield|floatformat:"-2"}} {{m.unit}}</td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <th scope='row'>Total yield</th>
+                <th scope='col'>{{mixture.total_yield|floatformat:"-2"}} {{mixture.unit}}</th>
+                <th scope='col'> 
+                </th>
+                <th scope='col' style="vertical-align: top;
+                    horizontal-align:center;">
+                    {% if expand_nests %}
+                        <input type="checkbox"
+                        value="" id="expandNest" checked>
+                    {% else %}
+                        <input type="checkbox"
+                        value="" id="expandNest">
+                    {% endif %}
+                    <label class="form-check-label" for="expandNest">
+                        Expand nests
+                    </label>
+                </th>
+            </tr>
+        </tfoot>
+    </table>
+    <div class="form-check">
+    </div>
+<div>
+
+<script type='text/javascript' src="{% static 'mixtures/js/toggle_nests.js' %}"></script>
+{% endblock %}
