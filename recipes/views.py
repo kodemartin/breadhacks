@@ -14,8 +14,8 @@ from .forms import (NestedMixtureForm, MixtureForm, IngredientFormSet,
 from .models import Ingredient, Mixture, Recipe
 
 
-__all__ = ['list_ingredients', 'add_new_mixture', 'RecipeFormView',
-           'mixture_preview']
+__all__ = ['list_ingredients', 'NewMixtureView', 'RecipeFormView',
+           'MixturePreview']
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -39,31 +39,97 @@ def list_ingredients(request):
     return render(request, 'ingredients/list.html', context)
 
 
-def add_new_mixture(request):
-    if request.method == 'POST':
-        form = MixtureForm(request.POST)
-        formset = IngredientFormSet(request.POST)
-        if all([form.is_valid(), formset.is_valid()]):
-            ingredient_quantity = {}
-            for f in formset:
-                ingredient = Ingredient.objects.get(id=f['ingredient'].value())
-                ingredient_quantity[ingredient] = int(f['quantity'].value())
-            mixture = Mixture.new(
-                title=form['title'].value(), unit=form['unit'].value(),
-                ingredient_quantity=ingredient_quantity
-                )
+class LoggedView(View):
+    """Subclass of `View` with a class-level
+    logger cached at first instantiation.
+    """
+    logger = None
 
-            return HttpResponse(
-                f'Congrats. You entered a valid mixture [{mixture.hash32}].'
-                )
-    else:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.logger = self.logger or logging.getLogger(self.__class__.__name__)
+
+
+class MixtureNestMixin:
+    """Mixin for views that have nested mixture forms."""
+
+    def extract_nested_mixtures(self, request, parent):
+        """Process the POST paylod in the request to
+        extract nested mixtures, represented by
+        a `DynamicLoadableMixtureForm`.
+
+        The mixtures extracted are factored considering
+        the quantity submitted in the form and the
+        total_yield stored in the database.
+
+        :param HttpRequest request:
+        :param str parent: The prefix used in the forms
+            for the parent mixture.
+        :rtype: list(Mixture)
+        """
+        base_prefix = f'{parent}_nested'
+        i = 0
+        nested = []
+        while True:
+            current_prefix = f'{base_prefix}_{i}'
+            current = DynamicLoadableMixtureForm(request.POST,
+                                                 prefix=current_prefix)
+            if not current.is_valid():
+                break
+            m, q = map(current.cleaned_data.get, ('mixture', 'quantity'))
+            m.multiply(q/m.total_yield)
+            nested.append(m)
+            self.logger.debug(f'==> Nested {current_prefix}')
+            self.logger.debug(f'==> Nested {m.ingredient_quantities}')
+            i += 1
+        return nested
+
+
+class NewMixtureView(LoggedView, MixtureNestMixin):
+
+    template_name = 'mixtures/new.html'
+
+    def get(self, request, *args, **kwargs):
         prefix = request.GET.get('prefix')
         form = MixtureForm(prefix=prefix)
         formset = IngredientFormSet(prefix=prefix)
+        mixture_load_pool = Mixture.objects.exclude(title__istartswith='final')
+        nested_mixture_template = DynamicLoadableMixtureForm(
+            queryset=mixture_load_pool, prefix='prefix'
+            )
 
-    return render(request, 'mixtures/new.html', {
-        'formset': formset, 'form': form, 'header': 'Add new mixture'
-        })
+        return render(request, 'mixtures/new.html', {
+            'formset': formset, 'form': form, 'header': 'Add new mixture',
+            'nested_mixture_template': nested_mixture_template
+            })
+
+    def post(self, request, *args, **kwargs):
+        form = MixtureForm(request.POST)
+        formset = IngredientFormSet(request.POST)
+        nested = self.extract_nested_mixtures(request, 'form')
+        if all([form.is_valid(), formset.is_valid()]):
+            ingredient_quantity = []
+            for f in formset:
+                ingredient_quantity.append(list(map(f.cleaned_data.get,
+                                               ('ingredient', 'quantity'))))
+            try:
+                with transaction.atomic():
+                    mixture = Mixture.new(
+                        title=form.cleaned_data['title'], unit=form.cleaned_data['unit'],
+                        ingredient_quantity=ingredient_quantity, mixtures=nested
+                        )
+                factor = 1.
+            except IntegrityError:
+                aggregate = Mixture.aggregate_ingredient_quantities(
+                    ingredient_quantity, *[m.ingredient_quantities for m in nested]
+                    )
+                hash32 = Mixture.evaluate_hash_static(aggregate)
+                mixture = Mixture.get_by_key(hash32)
+                factor = mixture.evaluate_factor(aggregate)
+
+            redirect_url = reverse('mixture-preview')
+            params = urlencode({'key': mixture.id, 'factor': factor})
+            return redirect(f'{redirect_url}?{params}')
 
 
 def load_mixture(request):
@@ -82,15 +148,29 @@ def load_mixture(request):
         })
 
 
-class LoggedView(View):
-    """Subclass of `View` with a class-level
-    logger cached at first instantiation.
-    """
-    logger = None
+class MixturePreview(LoggedView):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.logger = self.logger or logging.getLogger(self.__class__.__name__)
+    template_name = 'mixtures/preview.html'
+
+    def get(self, request, *args, **kwargs):
+        mixture = Mixture.get_by_key(request.GET['key'])
+        mixture_factor = float(request.GET.get('factor', '1.'))
+        expand_nests = int(request.GET.get('expand_nests', 0))
+        nested = [m.multiply(f*mixture_factor)
+                  for m, f in mixture.iter_mixture_factor()]
+        mixture.multiply(mixture_factor)
+        if not nested or expand_nests:
+            nested = None
+        else:
+            mixture.ingredient_quantities = mixture.iter_ingredient_quantities(
+                include_nested=False, factor=mixture_factor
+                )
+
+        return render(request, self.template_name, {
+            'mixture': mixture, 'nested': nested,
+            'header': f'Mixture: {mixture.title}',
+            'expand_nests': expand_nests or None
+            })
 
 
 class RecipePreview(LoggedView):
@@ -111,7 +191,7 @@ class RecipePreview(LoggedView):
             })
 
 
-class RecipeFormView(LoggedView):
+class RecipeFormView(LoggedView, MixtureNestMixin):
     template_name = 'new.html'
 
     def __init__(self, *args, **kwargs):
@@ -162,25 +242,6 @@ class RecipeFormView(LoggedView):
         params = urlencode({'key': recipe.id, 'factor': factor})
         return redirect(f'{redirect_url}?{params}')
 
-    def extract_nested_mixtures(self, request, parent='overall'):
-        base_prefix = f'{parent}_nested'
-        i = 0
-        nested = []
-        while True:
-            current_prefix = f'{base_prefix}_{i}'
-            current = DynamicLoadableMixtureForm(request.POST,
-                                                 prefix=current_prefix)
-            if not current.is_valid():
-                break
-            m, q = map(current.cleaned_data.get, ('mixture', 'quantity'))
-            m.multiply(q/m.total_yield)
-            nested.append(m)
-            self.logger.debug(f'==> Nested {current_prefix}')
-            self.logger.debug(f'==> Nested {m.ingredient_quantities}')
-            i += 1
-        self.nested['overall'] = nested
-        return nested
-
     def validate_overall_data(self, request):
         """Validate the title, unit of the recipe,
         and the ingredients of the overall formula.
@@ -206,7 +267,7 @@ class RecipeFormView(LoggedView):
         self.title = recipe_form.cleaned_data['title']
         self.unit = recipe_form.cleaned_data['unit']
         self.ingredients = list(overall_formula.generate_cleaned_data())
-        self.extract_nested_mixtures(request)
+        self.nested['overall'] = self.extract_nested_mixtures(request, 'overall')
 
     def extract_mixtures(self, request, prefix):
         """Traverse the transmitted forms in the request, to
@@ -344,12 +405,6 @@ class RecipeFormView(LoggedView):
                               self.partial, loaded=self.loaded,
                               nested=self.nested)
 
-
-def mixture_preview(request):
-    # TODO: Hanlde POST requests
-    key = request.GET['key']
-    mixture = get_object_or_404(Mixture, Q(id=key) | Q(hash32=key))
-    return HttpResponse(f'Mixture [{mixture.id}-{mixture.hash32}]')
 
 def list_partial_mixtures(request):
     term = request.GET.get('q', '')
