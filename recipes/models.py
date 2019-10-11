@@ -277,26 +277,36 @@ class Mixture(Hash32Model):
             cls.aggregate_ingredient_quantities(ingredient_quantities)
             )
 
+    def iter_mixture_factor(self):
+        """Generate all nested mixtures and their analogy
+        factor.
+        """
+        through = self.mixture.through.objects
+        for nest in through.filter(primary=self):
+            yield nest.nested, nest.factor
+
     def iter_mixture_ingredients(self, include_nested=True):
         through = self.ingredient.through.objects
-        factor = 1.
-        for mi in through.filter(mixture=self):
-            yield mi, factor
+        yield from through.filter(mixture=self)
         if include_nested:
-            through = self.mixture.through.objects
-            for nest in through.filter(primary=self):
-                for mi, factor in nest.nested.iter_mixture_ingredients():
-                    yield mi, nest.factor*factor
+            for nested, _ in self.iter_mixture_factor():
+                yield from nested.iter_mixture_ingredients()
 
-    def iter_ingredient_quantities(self, include_nested=True):
+    def iter_ingredient_quantities(self, include_nested=True, factor=1.):
         """Iterate on couples of ingredients and
         respective quantities that make up this
         mixture.
 
         :return: An iterator on tuples ``(ingredient-instance, quantity)``.
         """
-        for mi, factor in self.iter_mixture_ingredients(include_nested):
+        through = self.ingredient.through.objects
+        for mi in through.filter(mixture=self):
             yield (mi.ingredient, mi.quantity*factor)
+        if include_nested:
+            for nested, n_factor in self.iter_mixture_factor():
+                yield from nested.iter_ingredient_quantities(
+                    factor=factor*n_factor
+                    )
 
     @staticmethod
     def normalize(ingredient_quantity, reference='flour'):
