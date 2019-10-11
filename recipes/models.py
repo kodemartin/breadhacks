@@ -512,7 +512,8 @@ class Recipe(Hash32Model):
             # of different deductible mixtures included. The integrity
             # check is delegated to `Recipe.new`.
             ingredients = Mixture.aggregate_ingredient_quantities(
-                ingredient_quantity, *(mixtures or [])
+                ingredient_quantity,
+                *[m.ingredient_quantities for m in (mixtures or [])]
                 )
             self.overall = Mixture.get_duplicate(ingredients)
             self.overall_factor = self.overall.evaluate_factor(ingredients)
