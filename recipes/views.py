@@ -170,14 +170,14 @@ class RecipePreview(LoggedView):
     def get(self, request, *args, **kwargs):
         recipe = Recipe.get_by_key(request.GET['key'])
         recipe_factor = float(request.GET.get('factor', '1.'))
-        overall = recipe.overall.multiply(recipe.overall_factor*recipe_factor)
-        final = recipe.final.multiply(recipe.final_factor*recipe_factor)
-        deductible = [m.multiply(f*recipe_factor)
+        deductible = [(m, f*recipe_factor)
                       for m, f in recipe.iter_deductible_factor()]
 
         return render(request, self.template_name, {
-            'overall': overall, 'header': f'Recipe: {recipe.title}',
-            'final': final, 'deductible': deductible
+            'header': f'Recipe: {recipe.title}',
+            'overall': (recipe.overall, recipe.overall_factor*recipe_factor),
+            'final': (recipe.final, recipe.final_factor*recipe_factor),
+            'deductible': deductible,
             })
 
 

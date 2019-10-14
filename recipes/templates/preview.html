@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load widget_tweaks %}
+{% load mixture_extras %}
 
 {% block content %}
 <link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
@@ -15,84 +16,23 @@
             <h3>Overall formula</h3>
         </div>
     </div>
-    <table class='table table-striped'>
-        <thead>
-            <tr>
-                <th scope="col"></th>
-                <th scope="col">metric</th>
-                <th scope="col"></th>
-                <th scope="col"></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for i, q in overall.ingredient_quantities %}
-            <tr>
-                <td>{{i}}</td>
-                <td>{{q}} {{overall.unit}}</td>
-                <td></td>
-                <td></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    {% preview_mixture_table overall.0 overall.1 False %}
     <hr>
-    {% for m in deductible %}
+    {% for m, f in deductible %}
         <div class='row'>
             <div class='col'>
                 <h4>{{m.title}}</h4>
             </div>
         </div>
-        <table class='table table-striped'>
-            <thead>
-                <tr>
-                    <th scope="col"></th>
-                    <th scope="col">metric</th>
-                    <th scope="col"></th>
-                    <th scope="col"></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for i, q in m.ingredient_quantities %}
-                <tr>
-                    <td>{{i}}</td>
-                    <td>{{q}} {{m.unit}}</td>
-                    <td></td>
-                    <td></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        <hr>
+        {% preview_mixture_table m f False %}
     {% endfor %}
-    <table class='table table-striped'>
-        <div class='row'>
-            <div class='col'>
-                <h3>Mise-en-place</h3>
-            </div>
+    <hr>
+    <div class='row'>
+        <div class='col'>
+            <h3>Mise-en-place</h3>
         </div>
-        <thead>
-            <tr>
-                <th scope="col"></th>
-                <th scope="col">metric</th>
-                <th scope="col"></th>
-                <th scope="col"></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for i, q in final.ingredient_quantities %}
-            <tr>
-                <td>{{i}}</td>
-                {% if q %}
-                <td>{{q}} {{final.unit}}</td>
-                {% else %}
-                    <td>-</td>
-                {% endif %}
-                <td></td>
-                <td></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    </div>
+    {% preview_mixture_table final.0 final.1 True %}
 <div>
 
 {% endblock %}
