@@ -30,13 +30,20 @@ function addNestedMixture(btn, formClass = 'nested-mixture') {
     newElement.find(':input, label').each(function() {
         updatePrefix($(this), old, new_);
     });
+    newElement.find(':input').attr('required', true);
     return false;
 }
 
-function deleteNestedMixture(btn, form_class = 'nested-mixture') {
-    btn.closest('.' + form_class).remove();
-    return false;
+function deleteNestedMixture(btn, formClass = 'nested-mixture') {
+    let parentFormSet = btn.parents('.formset-dynamic');
+    let forms = parentFormSet.find(`.${formClass}`);
+    if (forms.length === 1) {
+        $(forms[0]).addClass('hidden');
+    } else {
+        btn.closest('.' + formClass).remove();
     }
+    return false;
+}
 
 $(document).on('click', '.add-nested', function(e){
     e.preventDefault();
@@ -48,4 +55,10 @@ $(document).on('click', '.remove-nested', function(e){
     e.preventDefault();
     deleteNestedMixture($(this));
     return false;
+});
+
+$(document).on('click', '[type=submit]', function(e){
+    let objects = $('.nested-mixture').filter('.hidden');
+    objects.find(':input').attr('required', false);
+    return true;
 });
