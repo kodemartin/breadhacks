@@ -22,8 +22,8 @@
             </tr>
         </thead>
         <tbody>
-            {% for i, q in mixture.ingredient_quantities %}
-            <tr>
+            {% for i, q in collapsed %}
+            <tr class='m-collapsed'>
                 <td>{{i}}</td>
                 <td>{{q|floatformat:"-2"}} {{mixture.unit}}</td>
                 <td></td>
@@ -31,9 +31,17 @@
             </tr>
             {% endfor %}
             {% for m in nested %}
-            <tr>
+            <tr class='m-collapsed'>
                 <td>{{m.title}}</td>
                 <td>{{m.total_yield|floatformat:"-2"}} {{m.unit}}</td>
+                <td></td>
+                <td></td>
+            </tr>
+            {% endfor %}
+            {% for i, q in mixture.ingredient_quantities %}
+            <tr class='m-expanded hidden'>
+                <td>{{i}}</td>
+                <td>{{q|floatformat:"-2"}} {{mixture.unit}}</td>
                 <td></td>
                 <td></td>
             </tr>
@@ -47,13 +55,8 @@
                 </th>
                 <th scope='col' style="vertical-align: top;
                     horizontal-align:center;">
-                    {% if expand_nests %}
-                        <input type="checkbox"
-                        value="" id="expandNest" checked>
-                    {% else %}
                         <input type="checkbox"
                         value="" id="expandNest">
-                    {% endif %}
                     <label class="form-check-label" for="expandNest">
                         Expand nests
                     </label>

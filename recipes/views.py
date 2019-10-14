@@ -155,21 +155,17 @@ class MixturePreview(LoggedView):
     def get(self, request, *args, **kwargs):
         mixture = Mixture.get_by_key(request.GET['key'])
         mixture_factor = float(request.GET.get('factor', '1.'))
-        expand_nests = int(request.GET.get('expand_nests', 0))
         nested = [m.multiply(f*mixture_factor)
                   for m, f in mixture.iter_mixture_factor()]
         mixture.multiply(mixture_factor)
-        if not nested or expand_nests:
-            nested = None
-        else:
-            mixture.ingredient_quantities = mixture.iter_ingredient_quantities(
-                include_nested=False, factor=mixture_factor
-                )
+        collapsed_nests = mixture.iter_ingredient_quantities(
+            include_nested=False, factor=mixture_factor
+            )
 
         return render(request, self.template_name, {
             'mixture': mixture, 'nested': nested,
             'header': f'Mixture: {mixture.title}',
-            'expand_nests': expand_nests or None
+            'collapsed': collapsed_nests
             })
 
 
