@@ -282,14 +282,15 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         prefix.
 
         The method iterates over the header info represented by
-        a `MixtureTitleForm` instance and the ingredient-quantity
-        pairs represented by a `IngredientFormset` instance.
+        a `MixtureTitleForm` instance, the ingredient-quantity
+        pairs represented by a `IngredientFormset` instance,
+        and any the nested mixture instances.
 
         :param HttpRequest request:
         :param str prefix: The prefix of the forms to be extracted.
         :return: A generator of
-            ``(MixtureTitleForm, IngredientQuantityFormSet)``
-            2-tuples.
+            ``(MixtureTitleForm, IngredientQuantityFormSet, list(Mixture))``
+            3-tuples.
         """
         i = 0
         while True:
@@ -299,7 +300,8 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
                 break
             ingredients = IngredientQuantityFormSet(request.POST,
                                                     prefix=current_prefix)
-            yield meta, ingredients
+            nested = self.extract_nested_mixtures(request, current_prefix)
+            yield meta, ingredients, nested
             i += 1
 
     @staticmethod
@@ -316,27 +318,35 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
             return JsonResponse({'error': 'Invalid partial mixture',
                                  'message': ingredients.errors})
 
-    def classify_loaded_mixture(self, header, ingredients):
-        """Check if the loaded mixture has been changed. On this event,
-        check if the mixture is a duplicate and if not classify
+    def classify_loaded_mixture(self, header, ingredients, nested=None):
+        """Check if the mixture is a duplicate and if not classify
         along with any new mixtures in `self.partial`. Otherwise,
         the mixture is classified in `self.loaded`.
 
-        New mixtures with changed titles are not accepted
-        so that to avoid storing different partial mixtures by
-        the same name.
-
         :param MixtureTitleForm header:
         :param IngredientQuantityFormSet ingredients:
+        :param nested: Any nested mixtures in the loaded
+            mixture.
+        :type nested: list(Mixture) or None
         :rtype: None
         :raises Http404: If the mixture is a duplicate
             and has a modified title.
         """
         title, ingredient_quantity = self.analyze_mixture(header, ingredients)
-        duplicate = Mixture.get_duplicate(ingredient_quantity)
+        self.logger.debug(f'==> Loaded ingredients {ingredient_quantity}')
+        self.logger.debug(f'  -> Loaded nested {nested}')
+        aggregate = Mixture.aggregate_ingredient_quantities(
+            ingredient_quantity,
+            *[m.ingredient_quantities for m in (nested or [])]
+            )
+        self.logger.debug(f'==> Loaded aggregate {aggregate}')
+        duplicate = Mixture.get_duplicate(aggregate)
         if duplicate is None:
+            if nested:
+                self.nested['partial'].append(nested)
             return self.partial.append((title, ingredient_quantity))
-        duplicate.multiply(duplicate.evaluate_factor(ingredient_quantity))
+        self.logger.debug(f'==> Found duplicate {duplicate}')
+        duplicate.multiply(duplicate.evaluate_factor(aggregate))
         return self.loaded.append(duplicate)
 
     @staticmethod
@@ -370,14 +380,13 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         :param str prefix: The prefix that identifies partial forms.
         """
         self.logger.debug("==> Processing partial mixtures..")
-        for header, ingredients in self.extract_mixtures(request, prefix):
+        for header, ingredients, nested in self.extract_mixtures(request, prefix):
             response = self.validate_mixture(header, ingredients)
             if response is not None:
                 return response
             self.partial.append(self.analyze_mixture(header, ingredients))
-            self.nested['partial'].append(
-                self.extract_nested_mixtures(request, header.prefix)
-                )
+            if nested:
+                self.nested['partial'].append(nested)
 
     def process_loaded_mixtures(self, request, prefix='loadable'):
         """Retrieve all data from any loaded mixture
@@ -399,11 +408,11 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         :rtype: None or `JsonResponse`
         """
         self.logger.debug("==> Processing loaded mixtures")
-        for header, ingredients in self.extract_mixtures(request, prefix):
+        for header, ingredients, nested in self.extract_mixtures(request, prefix):
             response = self.validate_mixture(header, ingredients)
             if response is not None:
                 return response
-            self.classify_loaded_mixture(header, ingredients)
+            self.classify_loaded_mixture(header, ingredients, nested)
 
     @transaction.atomic
     def save_recipe(self):
