@@ -74,7 +74,7 @@ class MixtureNestMixin:
         while True:
             current_prefix = f'{base_prefix}_{i}'
             current = MixtureQuantityForm(request.POST,
-                                                 prefix=current_prefix)
+                                          prefix=current_prefix)
             if not current.is_valid():
                 break
             m, q = map(current.cleaned_data.get, ('mixture', 'quantity'))
