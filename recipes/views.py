@@ -1,6 +1,7 @@
 import logging
 import json
 
+from collections import defaultdict
 from urllib.parse import urlencode
 from django.http import HttpResponse, Http404, JsonResponse
 from django.db import transaction, IntegrityError
@@ -206,7 +207,7 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         self.ingredients = None
         self.partial = []
         self.loaded = []
-        self.nested = {}
+        self.nested = defaultdict(list)
 
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
@@ -369,7 +370,6 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         :param str prefix: The prefix that identifies partial forms.
         """
         self.logger.debug("==> Processing partial mixtures..")
-        self.nested['partial'] = self.nested.get('partial') or []
         for header, ingredients in self.extract_mixtures(request, prefix):
             response = self.validate_mixture(header, ingredients)
             if response is not None:
