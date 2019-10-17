@@ -33,23 +33,31 @@
         </tr>
         {% endfor %}
     </tbody>
-    <tfoot>
-        <tr>
-            <th scope='row'>Total yield</th>
-            <th scope='col'>{{mixture.total_yield|floatformat:"-2"}} {{mixture.unit}}</th>
-            <th scope='col'></th>
-            {% if toggle_nests %}
-                <th scope='col' style="vertical-align: top;
-                    horizontal-align:center;">
-                        <input type="checkbox"
-                        value="" id="expandNest">
-                    <label class="form-check-label" for="expandNest">
-                        Expand nests
-                    </label>
-                </th>
-            {% else %}
+    {% if show_total %}
+        <tfoot>
+            <tr>
+                <th scope='row'>Total yield</th>
+                <th scope='col'>
+                    {{mixture.total_yield|floatformat:"-2"}} {{mixture.unit}}</th>
                 <th scope='col'></th>
-            {% endif %}
-        </tr>
-    </tfoot>
+                <th scope='col'></th>
+            </tr>
+        </tfoot>
+    {% endif %}
+    {% if toggle_nests %}
+        <table class="table table-striped">
+            <tfoot>
+                <tr>
+                    <th scope='col' style="vertical-align: top;
+                        horizontal-align:center;">
+                            <input type="checkbox"
+                            value="" id="expandNest">
+                        <label class="form-check-label" for="expandNest">
+                            Expand nests
+                        </label>
+                    </th>
+                </tr>
+            </tfoot>
+        </table>
+    {% endif %}
 </table>

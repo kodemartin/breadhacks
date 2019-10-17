@@ -16,7 +16,7 @@
             <h3>Overall formula</h3>
         </div>
     </div>
-    {% preview_mixture_table overall.0 overall.1 False %}
+    {% preview_mixture_table overall.0 overall.1 show_total=True %}
     <hr>
     {% for m, f in deductible %}
         <div class='row'>
@@ -35,4 +35,5 @@
     {% preview_mixture_table final.0 final.1 True %}
 <div>
 
+<script type='text/javascript' src="{% static 'mixtures/js/toggle_nests.js' %}"></script>
 {% endblock %}
