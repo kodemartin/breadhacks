@@ -36,10 +36,41 @@
                     </button>
                 </div>
             {% endfor %}
-            <div class='row'>
-                <div class='col-2'>
+            {% for nested in nested_mixtures %}
+            {% if nested.initial %}
+                <div class='form-row mt-1 nested-mixture'>
+            {% else %}
+                <div class='form-row mt-1 nested-mixture hidden'>
+            {% endif %}
+                <div class='col'>
+                    {{nested.mixture.errors}}
+                    <label class="sr-only" for={{nested.mixture.id_for_label}}>
+                        {{nested.mixture.label}}
+                    </label>
+                    {{nested.mixture|add_class:"form-control mr-1 nm-field"}}
+                </div>
+                <div class='col'>
+                    {{nested.quantity.errors}}
+                    <label class="sr-only" for={{nested.quantity.id_for_label}}>
+                        {{nested.quantity.label}}
+                    </label>
+                    {{nested.quantity|add_class:"form-control mr-1 nm-field"}}
+                </div>
+                <button class='btn btn-outline-danger btn-sm remove-nested
+                mt-auto ml-1'>
+                    <span class='fa fa-minus'></span>
+                </button>
+            </div>
+            {% endfor %}
+            <div class='form-row'>
+                <div class='col-auto'>
                 <button class="btn btn-outline-success btn-sm add-ingredient my-2">
                     <span class='fa fa-plus'></span>Add ingredient
+                </button>
+                </div>
+                <div class='col-auto'>
+                <button class="btn btn-outline-info btn-sm add-nested my-2">
+                    <span class='fa fa-plus mr-1'></span>Add nested mixture
                 </button>
                 </div>
             </div>

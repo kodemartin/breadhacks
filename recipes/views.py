@@ -140,11 +140,26 @@ def load_mixture(request):
         initial = json.loads(request.POST['initial'])
         mixture_header = {key: initial[key] for key in ('title', 'unit')}
         ingredients = initial['ingredients']
+        nested = initial['nested']
+        mixture_load_pool = Mixture.objects.exclude(title__istartswith='final')
+        nested_mixtures = []
+        for i, m in enumerate(nested):
+            nested_prefix = "_".join((prefix, 'nested', str(i)))
+            nested_mixtures.append(DynamicLoadableMixtureForm(
+                queryset=mixture_load_pool, prefix=nested_prefix,
+                initial=m
+                ))
+        nested_mixtures = nested_mixtures or [
+            DynamicLoadableMixtureForm(
+                queryset=mixture_load_pool, prefix='prefix',
+                )
+            ]
 
     form = MixtureForm(prefix=prefix, initial=mixture_header)
     formset = IngredientFormSet(prefix=prefix, initial=ingredients)
     return render(request, 'mixtures/load.html', {
-        'formset': formset, 'form': form
+        'formset': formset, 'form': form,
+        'nested_mixtures': nested_mixtures
         })
 
 
@@ -409,9 +424,14 @@ def list_partial_mixtures(request):
 def list_mixture_ingredients(request):
     m_id = request.GET['id']
     mixture = Mixture.objects.get(id=m_id)
+    ingredients = mixture.iter_ingredient_quantities(include_nested=False)
+    nested = [(m, m.total_yield*f) for m, f in mixture.iter_mixture_factor()]
     response = {
         'title': mixture.title,
         'unit': mixture.unit,
-        'ingredients': [{'ingredient': i.id, 'quantity': q} for i, q in mixture]
+        'ingredients': [
+            {'ingredient': i.id, 'quantity': q} for i, q in ingredients
+            ],
+        'nested': [{'mixture': m.id, 'quantity': q} for m, q in nested]
         }
     return JsonResponse(response)

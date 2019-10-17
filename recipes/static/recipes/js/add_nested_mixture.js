@@ -12,14 +12,14 @@ function addNestedMixture(btn, formClass = 'nested-mixture') {
     let parentFormSet = btn.parents('.formset-dynamic');
     let baseForm = parentFormSet.find(`.${formClass}`).last();
     let newElement = baseForm.clone(true);
-    btn.parents('.row').before(newElement);
+    btn.parents('.form-row').before(newElement);
     // Update prefix
     let parentPrefix = parentFormSet.find('[id*=TOTAL]').attr('id')
                                     .match(/id_(\w+)-TOTAL_\w+/)[1];
     let idx = parentFormSet.find(`.${formClass}`).length - 1;
 
-    let old = /\d+/;
-    let new_ = idx;
+    let old = /nested_\d+/;
+    let new_ = `nested_${idx}`;
     if (newElement.hasClass('hidden')) {
         newElement.removeClass('hidden');
         baseForm.remove();
