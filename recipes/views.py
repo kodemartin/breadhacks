@@ -351,11 +351,15 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         :param str prefix: The prefix that identifies partial forms.
         """
         self.logger.debug("==> Processing partial mixtures..")
+        self.nested['partial'] = self.nested.get('partial') or []
         for header, ingredients in self.extract_mixtures(request, prefix):
             response = self.validate_mixture(header, ingredients)
             if response is not None:
                 return response
             self.partial.append(self.analyze_mixture(header, ingredients))
+            self.nested['partial'].append(
+                self.extract_nested_mixtures(request, header.prefix)
+                )
 
     def process_loaded_mixtures(self, request, prefix='loadable'):
         """Retrieve all data from any loaded mixture
