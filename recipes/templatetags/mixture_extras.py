@@ -5,7 +5,8 @@ register = template.Library()
 
 
 @register.inclusion_tag('mixtures/preview_table.html')
-def preview_mixture_table(mixture, factor=1., toggle_nests=False):
+def preview_mixture_table(mixture, factor=1., toggle_nests=False,
+                          show_total=False):
     """Prepare the context for the template of a table preview
     for a given mixture.
 
@@ -19,4 +20,4 @@ def preview_mixture_table(mixture, factor=1., toggle_nests=False):
     collapsed = mixture.iter_ingredient_quantities(include_nested=False,
                                                    factor=factor)
     return {'mixture': mixture, 'nested': nested, 'collapsed': collapsed,
-            'toggle_nests': toggle_nests}
+            'toggle_nests': toggle_nests, 'show_total': show_total}
