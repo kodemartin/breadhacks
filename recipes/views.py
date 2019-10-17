@@ -9,8 +9,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views import defaults, View
 from django.urls import reverse
 
-from .forms import (NestedMixtureForm, MixtureForm, IngredientFormSet,
-                    LoadableMixtureForm, DynamicLoadableMixtureForm)
+from .forms import (MixtureTitleForm, MixtureForm, IngredientQuantityFormSet,
+                    MixtureInstanceForm, MixtureQuantityForm)
 from .models import Ingredient, Mixture, Recipe
 
 
@@ -56,7 +56,7 @@ class MixtureNestMixin:
     def extract_nested_mixtures(self, request, parent):
         """Process the POST paylod in the request to
         extract nested mixtures, represented by
-        a `DynamicLoadableMixtureForm`.
+        a `MixtureQuantityForm`.
 
         The mixtures extracted are factored considering
         the quantity submitted in the form and the
@@ -72,7 +72,7 @@ class MixtureNestMixin:
         nested = []
         while True:
             current_prefix = f'{base_prefix}_{i}'
-            current = DynamicLoadableMixtureForm(request.POST,
+            current = MixtureQuantityForm(request.POST,
                                                  prefix=current_prefix)
             if not current.is_valid():
                 break
@@ -92,9 +92,9 @@ class NewMixtureView(LoggedView, MixtureNestMixin):
     def get(self, request, *args, **kwargs):
         prefix = request.GET.get('prefix')
         form = MixtureForm(prefix=prefix)
-        formset = IngredientFormSet(prefix=prefix)
+        formset = IngredientQuantityFormSet(prefix=prefix)
         mixture_load_pool = Mixture.objects.exclude(title__istartswith='final')
-        nested_mixture_template = DynamicLoadableMixtureForm(
+        nested_mixture_template = MixtureQuantityForm(
             queryset=mixture_load_pool, prefix='prefix'
             )
 
@@ -105,7 +105,7 @@ class NewMixtureView(LoggedView, MixtureNestMixin):
 
     def post(self, request, *args, **kwargs):
         form = MixtureForm(request.POST)
-        formset = IngredientFormSet(request.POST)
+        formset = IngredientQuantityFormSet(request.POST)
         nested = self.extract_nested_mixtures(request, 'form')
         if all([form.is_valid(), formset.is_valid()]):
             ingredient_quantity = []
@@ -145,18 +145,18 @@ def load_mixture(request):
         nested_mixtures = []
         for i, m in enumerate(nested):
             nested_prefix = "_".join((prefix, 'nested', str(i)))
-            nested_mixtures.append(DynamicLoadableMixtureForm(
+            nested_mixtures.append(MixtureQuantityForm(
                 queryset=mixture_load_pool, prefix=nested_prefix,
                 initial=m
                 ))
         nested_mixtures = nested_mixtures or [
-            DynamicLoadableMixtureForm(
+            MixtureQuantityForm(
                 queryset=mixture_load_pool, prefix='prefix',
                 )
             ]
 
     form = MixtureForm(prefix=prefix, initial=mixture_header)
-    formset = IngredientFormSet(prefix=prefix, initial=ingredients)
+    formset = IngredientQuantityFormSet(prefix=prefix, initial=ingredients)
     return render(request, 'mixtures/load.html', {
         'formset': formset, 'form': form,
         'nested_mixtures': nested_mixtures
@@ -210,10 +210,10 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
 
     def get(self, request, *args, **kwargs):
         recipe_form = MixtureForm(prefix='recipe')
-        overall_formula = IngredientFormSet(prefix='overall')
+        overall_formula = IngredientQuantityFormSet(prefix='overall')
         mixture_load_pool = Mixture.objects.exclude(title__istartswith='final')
-        loadable_mixture = LoadableMixtureForm(queryset=mixture_load_pool)
-        nested_mixture_template = DynamicLoadableMixtureForm(
+        loadable_mixture = MixtureInstanceForm(queryset=mixture_load_pool)
+        nested_mixture_template = MixtureQuantityForm(
             queryset=mixture_load_pool, prefix='prefix'
             )
         return render(request, self.template_name, {
@@ -263,7 +263,8 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         :return: None or HttpResponseBadRequest
         """
         recipe_form = MixtureForm(request.POST, prefix='recipe')
-        overall_formula = IngredientFormSet(request.POST, prefix='overall')
+        overall_formula = IngredientQuantityFormSet(request.POST,
+                                                    prefix='overall')
         for form in (recipe_form, overall_formula):
             if not form.is_valid():
                 # TODO: More user-friendly handling
@@ -280,21 +281,23 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         prefix.
 
         The method iterates over the header info represented by
-        a `NestedMixtureForm` instance and the ingredient-quantity
+        a `MixtureTitleForm` instance and the ingredient-quantity
         pairs represented by a `IngredientFormset` instance.
 
         :param HttpRequest request:
         :param str prefix: The prefix of the forms to be extracted.
-        :return: A generator of ``(NestedMixtureForm, IngredientFormSet)``
+        :return: A generator of
+            ``(MixtureTitleForm, IngredientQuantityFormSet)``
             2-tuples.
         """
         i = 0
         while True:
             current_prefix = f'{prefix}_{i}'
-            meta = NestedMixtureForm(request.POST, prefix=current_prefix)
+            meta = MixtureTitleForm(request.POST, prefix=current_prefix)
             if not meta.is_valid():
                 break
-            ingredients = IngredientFormSet(request.POST, prefix=current_prefix)
+            ingredients = IngredientQuantityFormSet(request.POST,
+                                                    prefix=current_prefix)
             yield meta, ingredients
             i += 1
 
@@ -303,8 +306,8 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         """Check that the partial mixture represented
         by the specified ingredients is valid.
 
-        :param NestedMixtureForm header:
-        :param IngredientFormSet ingredients:
+        :param MixtureTitleForm header:
+        :param IngredientQuantityFormSet ingredients:
         :rtype: None or JsonResponse
         """
         if not ingredients.is_valid():
@@ -322,8 +325,8 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         so that to avoid storing different partial mixtures by
         the same name.
 
-        :param NestedMixtureForm header:
-        :param IngredientFormSet ingredients:
+        :param MixtureTitleForm header:
+        :param IngredientQuantityFormSet ingredients:
         :rtype: None
         :raises Http404: If the mixture is a duplicate
             and has a modified title.
@@ -341,8 +344,8 @@ class RecipeFormView(LoggedView, MixtureNestMixin):
         passed as arguments to its title and ingredient-quantity
         pairs.
 
-        :param NestedMixtureForm header:
-        :param IngredientFormSet ingredients:
+        :param MixtureTitleForm header:
+        :param IngredientQuantityFormSet ingredients:
         :rtype: tuple
         :return: A ``(<title>, <ingredient-quantity>)``
             2-tuples, where ``<ingredient-quantity>`` is a

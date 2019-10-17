@@ -3,7 +3,7 @@ from django import forms
 from .models import Ingredient, Mixture, MixtureIngredient, Recipe
 
 
-class LoadableMixtureField(forms.ModelChoiceField):
+class MixtureField(forms.ModelChoiceField):
 
     def label_from_instance(self, obj):
         if obj.recipes.all():
@@ -18,10 +18,10 @@ class LoadableMixtureField(forms.ModelChoiceField):
         return label
 
 
-class LoadableMixtureForm(forms.ModelForm):
+class MixtureInstanceForm(forms.ModelForm):
 
-    mixture = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
-                                   empty_label="...or load a mixture")
+    mixture = MixtureField(queryset=Mixture.objects.none(), required=False,
+                           empty_label="...or load a mixture")
 
     def __init__(self, *args, queryset=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -32,16 +32,16 @@ class LoadableMixtureForm(forms.ModelForm):
         fields = ['mixture']
 
 
-class DynamicLoadableMixtureForm(LoadableMixtureForm):
+class MixtureQuantityForm(MixtureInstanceForm):
     """Allow specifying the total_yield of the nested mixture
     specified through this form.
     """
-    mixture = LoadableMixtureField(queryset=Mixture.objects.none(), required=False,
-                                   empty_label="Choose mixture...")
+    mixture = MixtureField(queryset=Mixture.objects.none(), required=False,
+                           empty_label="Choose mixture...")
     quantity = forms.FloatField(min_value=1., max_value=2<<31)
 
 
-class NestedMixtureForm(forms.ModelForm):
+class MixtureTitleForm(forms.ModelForm):
     """Nested mixtures are specified as part of a higher-level
     object, such as a recipe. The unit is thus dependent on the
     latter.
@@ -59,7 +59,7 @@ class MixtureForm(forms.ModelForm):
         fields = ['title', 'unit']
 
 
-class MixtureIngredientForm(forms.ModelForm):
+class IngredientQuantityForm(forms.ModelForm):
 
     ingredient = forms.ModelChoiceField(Ingredient.objects.all(),
                                         empty_label='Choose ingredient...')
@@ -85,7 +85,7 @@ class CustomFormSet(forms.BaseFormSet):
                 yield tuple(cleaned[name] for name in field_names)
 
 
-IngredientFormSet = forms.formset_factory(
-    MixtureIngredientForm, formset=CustomFormSet, min_num=2,
+IngredientQuantityFormSet = forms.formset_factory(
+    IngredientQuantityForm, formset=CustomFormSet, min_num=2,
     validate_min=True
     )
