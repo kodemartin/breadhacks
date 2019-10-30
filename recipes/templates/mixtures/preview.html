@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+{% load mixture_extras %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
+
+<div class='container'>
+    <div class='row'>
+        <div class='col'>
+            <h2>{{mixture.title}}</h2>
+        </div>
+    </div>
+    <hr>
+    {% preview_mixture_table mixture factor toggle_nests True %}
+<div>
+
+<script type='text/javascript' src="{% static 'mixtures/js/toggle_nests.js' %}"></script>
+{% endblock %}

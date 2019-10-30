@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
+
+<div class='container'>
+<form action="/recipes/new/" method="post">
+    {% csrf_token %}
+    <h2>Recipe</h2>
+    <div class='form-row'>
+        <div class='col-6'>
+            {{recipe.title.errors}}
+            <label class="sr-only" for={{overall.title.id_for_label}}>
+                {{recipe.title.label}}
+            </label>
+            {{recipe.title|add_class:"form-control"|attr:"placeholder:Recipe title"}}
+        </div>
+        <div class='col form-inline ml-auto'>
+            {{recipe.unit.errors}}
+            <label class='pr-1' for={{recipe.unit.id_for_label}}>
+                {{recipe.unit.label}}:
+            </label>
+            {{recipe.unit|add_class:"form-control"|attr:"id:master-units"}}
+        </div>
+    </div>
+    <div class="mt-3">
+    <h3>Overall formula</h3>
+    </div>
+    <div class="formset-dynamic">
+        {{overall.management_form}}
+    {% for f in overall %}
+        <div class='form-row form-dynamic mt-1'>
+            {% for field in f %}
+                <div class='col'>
+                    {{field.errors}}
+                    <label class="sr-only" for={{field.id_for_label}}>
+                        {{field.label}}
+                    </label>
+                    {{field|add_class:"form-control mr-1"}}
+                </div>
+            {% endfor %}
+            <button class='btn btn-outline-danger btn-sm remove-ingredient
+            mt-auto ml-1'>
+                <span class='fa fa-minus'></span>
+            </button>
+        </div>
+    {% endfor %}
+    <div class='form-row mt-1 nested-mixture hidden'>
+        <div class='col'>
+            {{nested_mixture_template.mixture.errors}}
+            <label class="sr-only" for={{nested_mixture_template.mixture.id_for_label}}>
+                {{nested_mixture_template.mixture.label}}
+            </label>
+            {{nested_mixture_template.mixture|add_class:"form-control mr-1 nm-field"}}
+        </div>
+        <div class='col'>
+            {{nested_mixture_template.quantity.errors}}
+            <label class="sr-only" for={{nested_mixture_template.quantity.id_for_label}}>
+                {{nested_mixture_template.quantity.label}}
+            </label>
+            {{nested_mixture_template.quantity|add_class:"form-control mr-1 nm-field"}}
+        </div>
+        <button class='btn btn-outline-danger btn-sm remove-nested
+        mt-auto ml-1'>
+            <span class='fa fa-minus'></span>
+        </button>
+    </div>
+        <div class='form-row'>
+            <div class='col-auto'>
+            <button class="btn btn-outline-success btn-sm add-ingredient my-2">
+                <span class='fa fa-plus mr-1'></span>Add ingredient
+            </button>
+            </div>
+            <div class='col-auto'>
+            <button class="btn btn-outline-info btn-sm add-nested my-2">
+                <span class='fa fa-plus mr-1'></span>Add nested mixture
+            </button>
+            </div>
+        </div>
+    </div>
+    <hr>
+    <div class='row'>
+        <div class='col'>
+            <button class="btn btn-success btn-sm my-2" id="add-mixture">
+                <span class='fa fa-plus mr-1'></span>Add partial mixture
+            </button>
+        </div>
+        {% for f in loadable_mixture %}
+            {{f.errors}}
+            <div class='col my-2'>
+                <label class="sr-only" for={{field.id_for_label}}>
+                    {{f.label}}
+                </label>
+                {{f|add_class:"form-control mr-1"|attr:"id:loadable-mixture"}}
+            </div>
+        {% endfor %}
+    </div>
+    <div class='row'>
+        <div class='col'>
+        <button type="submit" class="btn btn-primary btn-sm btn-block my-4">
+            Submit recipe
+        </button>
+        </div>
+    </div>
+</form>
+</div>
+
+<div>
+
+<script type='text/javascript' src="{% static 'mixtures/js/ingredients.js' %}"></script>
+<script type='text/javascript' src="{% static 'recipes/js/add_partial_mixture.js' %}"></script>
+<script type='text/javascript'
+        src="{% static 'recipes/js/validate_partial_mixtures.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/gh/xcash/bootstrap-autocomplete@v2.2.2/dist/latest/bootstrap-autocomplete.min.js"></script>
+
+<script type='text/javascript' src="{% static 'base/js/utils.js' %}"></script>
+<script type='text/javascript' src="{% static 'recipes/js/load_mixture.js' %}"></script>
+<script type='text/javascript' src="{% static 'recipes/js/add_nested_mixture.js' %}"></script>
+{% endblock %}

@@ -1,5 +1,6 @@
 from django.db import models
 from functools import wraps
+from inspect import signature
 
 from custom_fields import UnsignedIntegerField
 
@@ -14,13 +15,16 @@ def update_properties_and_save(method):
     ``update_properties`` method.
 
     For the decoration to take effect,
-    a key-word argument ``atomic`` should
-    be passed to the decorated method.
+    the key-word argument ``atomic`` should
+    be set to True while calling the decorated
+    method.
     """
+    sig = signature(method)
+
     @wraps(method)
     def wrapper(self, *args, **kwargs):
         method(self, *args, **kwargs)
-        if kwargs.get('atomic'):
+        if kwargs.get('atomic', sig.parameters['atomic'].default):
             self.update_properties()
             self.save()
 
@@ -42,3 +46,18 @@ class Hash32Model(models.Model):
 
     def update_properties(self):
         self.update_hash()
+
+    @classmethod
+    def get_by_key(cls, key):
+        """Return an object by querying the database
+        for the specified key. The method first
+        checks the `id` and then the `hash32` field.
+
+        :param key: The key to lookup
+        :type key: int or str
+        :rtype: Mixture
+        :raises DoesNotExist: If not object is found
+            in the database.
+        """
+        Q = models.Q
+        return cls.objects.get(Q(id=key) | Q(hash32=key))

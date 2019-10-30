@@ -1,24 +1,5 @@
-{% extends "../base.html" %}
-{% load static %}
 {% load widget_tweaks %}
 
-{% block content %}
-<link rel="stylesheet" type="text/css" href="{% static 'recipes/css/style.css' %}">
-
-<div class='container'>
-<form action="/recipes/mixture/new/" method="post">
-    {% csrf_token %}
-    <div class='row'>
-        <div class='col mt-4'>
-            <h2>New mixture</h2>
-        </div>
-    </div>
-    <hr>
-    <div class='row'>
-        <div class='col my-2'>
-            <h3>Ingredients</h2>
-        </div>
-    </div>
     <div class='partial-mixture-template'>
         <div class='form-row'>
             <div class='col-3'>
@@ -55,26 +36,32 @@
                     </button>
                 </div>
             {% endfor %}
-            <div class='form-row mt-1 nested-mixture hidden'>
+            {% for nested in nested_mixtures %}
+            {% if nested.initial %}
+                <div class='form-row mt-1 nested-mixture'>
+            {% else %}
+                <div class='form-row mt-1 nested-mixture hidden'>
+            {% endif %}
                 <div class='col'>
-                    {{nested_mixture_template.mixture.errors}}
-                    <label class="sr-only" for={{nested_mixture_template.mixture.id_for_label}}>
-                        {{nested_mixture_template.mixture.label}}
+                    {{nested.mixture.errors}}
+                    <label class="sr-only" for={{nested.mixture.id_for_label}}>
+                        {{nested.mixture.label}}
                     </label>
-                    {{nested_mixture_template.mixture|add_class:"form-control mr-1 nm-field"}}
+                    {{nested.mixture|add_class:"form-control mr-1 nm-field"}}
                 </div>
                 <div class='col'>
-                    {{nested_mixture_template.quantity.errors}}
-                    <label class="sr-only" for={{nested_mixture_template.quantity.id_for_label}}>
-                        {{nested_mixture_template.quantity.label}}
+                    {{nested.quantity.errors}}
+                    <label class="sr-only" for={{nested.quantity.id_for_label}}>
+                        {{nested.quantity.label}}
                     </label>
-                    {{nested_mixture_template.quantity|add_class:"form-control mr-1 nm-field"}}
+                    {{nested.quantity|add_class:"form-control mr-1 nm-field"}}
                 </div>
                 <button class='btn btn-outline-danger btn-sm remove-nested
                 mt-auto ml-1'>
                     <span class='fa fa-minus'></span>
                 </button>
             </div>
+            {% endfor %}
             <div class='form-row'>
                 <div class='col-auto'>
                 <button class="btn btn-outline-success btn-sm add-ingredient my-2">
@@ -89,16 +76,3 @@
             </div>
         </div>
     </div>
-    <div class='row'>
-        <div class='col'>
-        <button type="submit" class="btn btn-primary btn-sm btn-block my-4">
-            Submit mixture
-        </button>
-        </div>
-    </div>
-</form>
-</div>
-
-<script type='text/javascript' src="{% static 'mixtures/js/ingredients.js' %}"></script>
-<script type='text/javascript' src="{% static 'recipes/js/add_nested_mixture.js' %}"></script>
-{% endblock %}

@@ -1,0 +1,35 @@
+hr {
+  background-color: #4b6a78;
+  height: 2px;
+}
+
+.table-striped > tbody > tr:nth-child(2n+1) > td, .table-striped > tbody > tr:nth-child(2n+1) > th {
+  background-color: #4b6a78;
+  color: #eee;
+}
+
+.table-striped > tbody > tr:nth-child(2n) > td, .table-striped > tbody > tr:nth-child(2n) > th {
+  background-color: #eee;
+  color: #4b6a78;
+}
+
+.hidden {
+  display: None;
+}
+
+.add-nested {
+  border-color: #4b6a78;
+  color: #4b6a78;
+}
+
+.remove-nested {
+  border-color: orange;
+  color: orange;
+}
+
+.nm-field {
+  background-color: #4b6a78;
+  color: #eee;
+}
+
+/*# sourceMappingURL=style.css.map */

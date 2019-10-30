@@ -11,57 +11,77 @@ function updateElementIndex(el, prefix, ndx) {
     if (el.id) el.id = el.id.replace(id_regex, replacement);
     if (el.name) el.name = el.name.replace(id_regex, replacement);
 }
-function cloneMore(selector, prefix) {
-    console.log($(selector));
-    var newElement = $(selector).clone(true);
-    var total = $('#id_' + prefix + '-TOTAL_FORMS').val();
-    newElement.find(':input:not([type=button]):not([type=submit]):not([type=reset])').each(function() {
-            var name = $(this).prop('name').replace('-' + (total-1) + '-', '-' + total + '-');
-            var id = 'id_' + name;
-            $(this).attr({'name': name, 'id': id}).val('').removeAttr('checked');
+
+function addForm(btn, form_class = 'form-dynamic') {
+    const [formset, form_total, prefix] = closestFormsetInfo(btn);
+    const base_form = formset.children('.' + form_class).last();
+    const newElement = base_form.clone(true);
+    let total = form_total.val();
+    newElement.find(
+        ':input:not([type=button]:not([type=submit]:not([type=reset])))'
+        ).each(function() {
+            let name = $(this).prop('name').replace('-' + (total-1) + '-', '-' + total + '-');
+            let id = 'id_' + name;
+            $(this).attr({'name': name, 'id': id});
         });
     newElement.find('label').each(function() {
-            var forValue = $(this).attr('for');
+            let forValue = $(this).prop('for');
             if (forValue) {
-                      forValue = forValue.replace('-' + (total-1) + '-', '-' + total + '-');
-                      $(this).attr({'for': forValue});
-                    }
+                  forValue = forValue.replace('-' + (total-1) + '-', '-' + total + '-');
+                  $(this).attr({'for': forValue});
+                  }
         });
     total++;
-    $('#id_' + prefix + '-TOTAL_FORMS').val(total);
-    $(selector).after(newElement);
-    /*var conditionRow = $('.form-row:not(:last)');
-    *conditionRow.find('.btn.add-ingredient')
-    *.removeClass('btn-success').addClass('btn-danger')
-    *.removeClass('add-ingredient').addClass('remove-ingredient')
-    *.html('<span class="fa fa-minus"></span>')
-    */
+    $('#' + form_total.prop('id')).val(total);
+    base_form.after(newElement);
     return false;
 }
-function deleteForm(prefix, btn) {
-    var total = parseInt($('#id_' + prefix + '-TOTAL_FORMS').val());
-    console.log(total);
+
+function deleteForm(btn, form_class = 'form-dynamic') {
+    const [formset, form_total, prefix] = closestFormsetInfo(btn);
+    let total = parseInt(form_total.val());
     if (total > 2){
-            btn.closest('.form-dynamic').remove();
-            var forms = $('.form-dynamic');
-            $('#id_' + prefix + '-TOTAL_FORMS').val(forms.length);
-            for (var i=0, formCount=forms.length; i<formCount; i++) {
-                        $(forms.get(i)).find(':input').each(function() {
-                                        updateElementIndex(this, prefix, i);
-                                    });
-                    }
+        btn.closest('.' + form_class).remove();
+        let forms = formset.children('.form-dynamic');
+        $('#' + form_total.prop('id')).val(forms.length);
+        for (let i=0, formCount=forms.length; i<formCount; i++) {
+                $(forms.get(i)).find(':input').each(function() {
+                    updateElementIndex(this, prefix, i);
+                    });
+                }
     } else {
         alert("More than two ingredients are required...");
     }
     return false;
 }
+
+function closestFormsetInfo(btn, formset_class = 'formset-dynamic') {
+    /**
+     * Find the closest formset to the specified `btn`, and
+     * aggregate related information.
+     *
+     *  @param {Element} btn The reference button.
+     *  @param {String} formset_class The class of the parent formset.
+     *  @returns {Array} A tuple with the following elements:
+     *      - The jQuery object of the parent formset.
+     *      - The jQuery object with the ``*TOTAL_FORMS`` component
+     *        of the management form.
+     *      - The prefix used for the parent formset.
+     */
+    const formset = btn.closest('.' + formset_class);
+    const form_total = formset.children('[id*=TOTAL_FORMS]');
+    const prefix = /id_(\w+)-TOTAL_FORMS/ig.exec(form_total.prop('id'))[1];
+    return [formset, form_total, prefix];
+}
+
 $(document).on('click', '.add-ingredient', function(e){
     e.preventDefault();
-    cloneMore('.form-dynamic:last', 'form');
+    addForm($(this));
     return false;
 });
+
 $(document).on('click', '.remove-ingredient', function(e){
     e.preventDefault();
-    deleteForm('form', $(this));
+    deleteForm($(this));
     return false;
 });
