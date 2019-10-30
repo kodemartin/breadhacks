@@ -47,10 +47,35 @@
             </button>
         </div>
     {% endfor %}
-        <div class='row'>
-            <div class='col-2'>
+    <div class='form-row mt-1 nested-mixture hidden'>
+        <div class='col'>
+            {{nested_mixture_template.mixture.errors}}
+            <label class="sr-only" for={{nested_mixture_template.mixture.id_for_label}}>
+                {{nested_mixture_template.mixture.label}}
+            </label>
+            {{nested_mixture_template.mixture|add_class:"form-control mr-1 nm-field"}}
+        </div>
+        <div class='col'>
+            {{nested_mixture_template.quantity.errors}}
+            <label class="sr-only" for={{nested_mixture_template.quantity.id_for_label}}>
+                {{nested_mixture_template.quantity.label}}
+            </label>
+            {{nested_mixture_template.quantity|add_class:"form-control mr-1 nm-field"}}
+        </div>
+        <button class='btn btn-outline-danger btn-sm remove-nested
+        mt-auto ml-1'>
+            <span class='fa fa-minus'></span>
+        </button>
+    </div>
+        <div class='form-row'>
+            <div class='col-auto'>
             <button class="btn btn-outline-success btn-sm add-ingredient my-2">
                 <span class='fa fa-plus mr-1'></span>Add ingredient
+            </button>
+            </div>
+            <div class='col-auto'>
+            <button class="btn btn-outline-info btn-sm add-nested my-2">
+                <span class='fa fa-plus mr-1'></span>Add nested mixture
             </button>
             </div>
         </div>
@@ -92,4 +117,5 @@
 
 <script type='text/javascript' src="{% static 'base/js/utils.js' %}"></script>
 <script type='text/javascript' src="{% static 'recipes/js/load_mixture.js' %}"></script>
+<script type='text/javascript' src="{% static 'recipes/js/add_nested_mixture.js' %}"></script>
 {% endblock %}

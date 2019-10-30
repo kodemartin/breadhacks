@@ -1,0 +1,63 @@
+<table class='table table-striped'>
+    <thead>
+        <tr>
+            <th scope="col"></th>
+            <th scope="col">metric</th>
+            <th scope="col"></th>
+            <th scope="col"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for i, q in collapsed %}
+        <tr class='m-collapsed'>
+            <td>{{i}}</td>
+            <td>{{q|floatformat:"-2"}} {{mixture.unit}}</td>
+            <td></td>
+            <td></td>
+        </tr>
+        {% endfor %}
+        {% for m in nested %}
+        <tr class='m-collapsed'>
+            <td>{{m.title}}</td>
+            <td>{{m.total_yield|floatformat:"-2"}} {{m.unit}}</td>
+            <td></td>
+            <td></td>
+        </tr>
+        {% endfor %}
+        {% for i, q in mixture.ingredient_quantities %}
+        <tr class='m-expanded hidden'>
+            <td>{{i}}</td>
+            <td>{{q|floatformat:"-2"}} {{mixture.unit}}</td>
+            <td></td>
+            <td></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    {% if show_total %}
+        <tfoot>
+            <tr>
+                <th scope='row'>Total yield</th>
+                <th scope='col'>
+                    {{mixture.total_yield|floatformat:"-2"}} {{mixture.unit}}</th>
+                <th scope='col'></th>
+                <th scope='col'></th>
+            </tr>
+        </tfoot>
+    {% endif %}
+    {% if toggle_nests %}
+        <table class="table table-striped">
+            <tfoot>
+                <tr>
+                    <th scope='col' style="vertical-align: top;
+                        horizontal-align:center;">
+                            <input type="checkbox"
+                            value="" id="expandNest">
+                        <label class="form-check-label" for="expandNest">
+                            Expand nests
+                        </label>
+                    </th>
+                </tr>
+            </tfoot>
+        </table>
+    {% endif %}
+</table>

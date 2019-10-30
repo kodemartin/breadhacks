@@ -12,3 +12,24 @@ hr {
   background-color: #eee;
   color: #4b6a78;
 }
+
+.hidden {
+  display: None;
+}
+
+.add-nested {
+  border-color: #4b6a78;
+  color: #4b6a78;
+}
+
+.remove-nested {
+  border-color: orange;
+  color: orange;
+}
+
+.nm-field {
+  background-color: #4b6a78;
+  color: #eee;
+}
+
+/*# sourceMappingURL=style.css.map */

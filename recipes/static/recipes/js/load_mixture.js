@@ -30,7 +30,7 @@ $('#loadable-mixture').change(function (){
         form.find('[id*=unit]').parent().remove();
         form.after('<hr>');
         // Remove extra form-rows
-        let to_remove = form.find("select").filter(function() {
+        let to_remove = form.find("select:not(:hidden)").filter(function() {
             return $(this).val() === "";
         }).parents('.form-row');
         let decr = to_remove.length;

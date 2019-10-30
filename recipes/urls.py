@@ -5,9 +5,10 @@ from . import views
 urlpatterns = [
     re_path(r'^ingredients/(?:$|index/$)', views.list_ingredients,
             name='ingredients-index'),
-    path('mixture/new/', views.add_new_mixture, name='mixture-new'),
+    path('mixture/new/', views.NewMixtureView.as_view(), name='mixture-new'),
     path('mixture/load/', views.load_mixture, name='mixture-load'),
-    path('mixture/preview', views.mixture_preview, name='mixture-preview'),
+    path('mixture/preview', views.MixturePreview.as_view(),
+         name='mixture-preview'),
     path('mixture/list/partial/', views.list_partial_mixtures,
          name='mixture-list-partial'),
     path('mixture/list/ingredients', views.list_mixture_ingredients,
