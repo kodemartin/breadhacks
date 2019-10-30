@@ -1,6 +1,7 @@
 import farmhash
 
 from collections import defaultdict
+from django.core.validators import MinValueValidator
 from django.db import models, transaction, IntegrityError
 from django.utils.functional import cached_property
 from custom_fields import UnsignedIntegerField
@@ -447,7 +448,7 @@ class Mixture(Hash32Model):
 class MixtureIngredient(models.Model):
     mixture = models.ForeignKey(Mixture, on_delete=models.CASCADE, blank=True)
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
-    quantity = UnsignedIntegerField()
+    quantity = models.FloatField(validators=[MinValueValidator(1e-06)])
 
     class Meta:
         db_table = 'mixture_ingredient'
