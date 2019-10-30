@@ -1,0 +1,13 @@
+h1 {
+    font: 2.2em 'Roboto';
+    font-weight: 100;
+    background-color: green;
+}
+li a {
+    color: green;
+}
+.sidebar-nav {
+    margin-top: 20px;
+    padding: 0;
+    list-style: none;
+}

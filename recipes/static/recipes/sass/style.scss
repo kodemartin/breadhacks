@@ -1,0 +1,36 @@
+$bg-color: #4b6a78;
+$secondary-color: #eee;
+
+hr {
+    background-color: $bg-color;
+    height: 2px;
+}
+
+.table-striped > tbody > tr:nth-child(2n+1) > td, .table-striped > tbody > tr:nth-child(2n+1) > th {
+    background-color: $bg-color;
+    color: $secondary-color;
+}
+
+.table-striped > tbody > tr:nth-child(2n) > td, .table-striped > tbody > tr:nth-child(2n) > th {
+    background-color: $secondary-color;
+    color: $bg-color;
+}
+
+.hidden {
+    display: None;
+}
+
+.add-nested {
+    border-color: $bg-color;
+    color: $bg-color;
+}
+
+.remove-nested{
+    border-color: orange;
+    color: orange;
+}
+
+.nm-field{
+    background-color: $bg-color;
+    color: $secondary-color;
+}

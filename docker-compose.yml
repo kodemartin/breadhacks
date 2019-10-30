@@ -23,6 +23,8 @@ services:
     build: .
     command: python3 manage.py runserver 0.0.0.0:8000
     container_name: django-project
+    environment:
+        DJANGO_SETTINGS_MODULE: breadhacks.settings
     volumes:
         - .:/src
     ports:

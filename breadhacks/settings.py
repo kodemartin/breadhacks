@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'recipes'
+    'recipes.apps.RecipesConfig',
+    'widget_tweaks'
 ]
 
 MIDDLEWARE = [
@@ -82,6 +83,12 @@ DATABASES = {
         'PASSWORD': '1234',
         'HOST': 'db',
         'PORT': '3306',
+        'TEST': {
+            'HOST': 'test-db',
+            'PORT': '3306',
+            'USER': 'test_baker',
+            'PASSWORD': '1234',
+            }
     }
 }
 
