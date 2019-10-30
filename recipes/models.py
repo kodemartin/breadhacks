@@ -258,9 +258,9 @@ class Mixture(Hash32Model):
         :rtype: int
         """
         quantities = cls.normalize(cls.sort(ingredient_quantity))
-        hsource = ''
+        hsource = f''
         for i, norm_quantity in quantities:
-            hsource += str(i.hash32) + str(norm_quantity)
+            hsource += f'{i.hash32}{norm_quantity:.3f}'
         return farmhash.hash32(hsource)
 
     @classmethod
