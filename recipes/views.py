@@ -444,6 +444,8 @@ def list_mixture_ingredients(request):
         'ingredients': [
             {'ingredient': i.id, 'quantity': q} for i, q in ingredients
             ],
-        'nested': [{'mixture': m.id, 'quantity': q} for m, q in nested]
+        'nested': [{'mixture': m.id, 'quantity': q} for m, q in nested],
+        'flatten': [(i.id, q) for i, q in mixture],
+        'yield': mixture.total_yield
         }
     return JsonResponse(response)

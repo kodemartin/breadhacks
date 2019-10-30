@@ -39,3 +39,36 @@ function sumReducer(accumulator, currentValue) {
      */
     return accumulator + currentValue;
 }
+
+function mapValueAdd(map, key, value) {
+    /**
+     *
+     * @param Map map
+     * @param hashable key
+     * @param Float or Integer value
+     *
+     */
+    const old = map.get(key);
+    if (old) {
+        map.set(key, value + old);
+    } else {
+        map.set(key, value);
+    }
+}
+
+function mapListPush(map, key, value) {
+    /**
+     * Push new values to an array mapped
+     * to a key.
+     *
+     * @param Map map
+     * @param hashable key
+     * @param Object value
+     *
+     */
+     if (map.get(key)) {
+         map.get(key).push(value);
+     } else {
+         map.set(key, [value,]);
+     }
+}

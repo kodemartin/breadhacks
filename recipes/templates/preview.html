@@ -8,7 +8,9 @@
 
 <div class='container'>
     <div class='row'>
-        <h2>{{header}}</h2>
+        <div class='col'>
+            <h2>{{header}}</h2>
+        </div>
     </div>
     <hr>
     <div class='row'>
@@ -18,15 +20,17 @@
     </div>
     {% preview_mixture_table overall.0 overall.1 show_total=True %}
     <hr>
-    {% for m, f in deductible %}
-        <div class='row'>
-            <div class='col'>
-                <h4>{{m.title}}</h4>
+    {% if deductible %}
+        {% for m, f in deductible %}
+            <div class='row'>
+                <div class='col'>
+                    <h4>{{m.title}}</h4>
+                </div>
             </div>
-        </div>
-        {% preview_mixture_table m f False %}
-    {% endfor %}
+            {% preview_mixture_table m f False %}
+        {% endfor %}
     <hr>
+    {% endif %}
     <div class='row'>
         <div class='col'>
             <h3>Mise-en-place</h3>
